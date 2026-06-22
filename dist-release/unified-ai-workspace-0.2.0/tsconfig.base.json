@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@uaiw/shared/*": ["packages/shared/src/*"],
+      "@uaiw/session-vault/*": ["packages/session-vault/src/*"],
+      "@uaiw/provider-adapters/*": ["packages/provider-adapters/src/*"]
+    }
+  }
+}

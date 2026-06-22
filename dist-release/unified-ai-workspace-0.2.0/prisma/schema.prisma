@@ -1,0 +1,662 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String               @id @default(cuid())
+  email             String               @unique
+  passwordHash      String?              @map("password_hash")
+  localAuthSecret   String?              @map("local_auth_secret")
+  displayName       String?              @map("display_name")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  providerSessions  ProviderConnection[]
+  threads           ChatThread[]
+  messages          Message[]
+  automationJobs    AutomationJob[]
+  auditLogs         AuditLog[]
+  internalApiKeys   InternalApiKey[]
+  internalApiUsageLogs InternalApiUsageLog[]
+  settings          UserSettings?
+  modelPreferences  UserModelPreference[]
+  providerRateLimitSettings ProviderRateLimitSetting[]
+  notificationEvents NotificationEvent[]
+  notificationDeliveryPreferences NotificationDeliveryPreference[]
+  notificationDeliveryAttempts NotificationDeliveryAttempt[]
+  notificationDeadLetters NotificationDeadLetter[]
+  notificationWebhookDestinations NotificationWebhookDestination[]
+  providerHealthIncidents ProviderHealthIncident[]
+  liveSubModelCaches ProviderLiveSubModelCache[]
+  providerDiagnosticsRuns ProviderDiagnosticsRun[]
+  providerDiagnosticsBaselines ProviderDiagnosticsBaseline[]
+  providerDiagnosticsDriftAlerts ProviderDiagnosticsDriftAlert[]
+  providerRecoveryPolicies ProviderRecoveryPolicy[]
+  providerRecoveryPolicyRuns ProviderRecoveryPolicyRun[]
+  providerRecoveryOverrides ProviderRecoveryOverride[]
+
+  @@map("users")
+}
+
+model ProviderConnection {
+  id                  String                   @id @default(cuid())
+  userId              String                   @map("user_id")
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider            String
+  status              String                   @default("not_connected")
+  encryptedSessionRef String?                  @map("encrypted_session_ref")
+  encryptedSessionBlob String?                 @map("encrypted_session_blob")
+  encryptionVersion   Int?                     @map("encryption_version")
+  browserProfileId    String?                  @map("browser_profile_id")
+  lastConnectedAt     DateTime?                @map("last_connected_at")
+  lastUsedAt          DateTime?                @map("last_used_at")
+  lastValidatedAt     DateTime?                @map("last_validated_at")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  errorCode           String?                  @map("error_code")
+  errorMessageSafe    String?                  @map("error_message_safe")
+
+  @@unique([userId, provider])
+  @@index([status])
+  @@map("provider_connections")
+}
+
+model ProviderDiagnosticsBaseline {
+  id                        String   @id @default(cuid())
+  userId                    String   @map("user_id")
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider                  String
+  connectionId              String?  @map("connection_id")
+
+  name                      String
+  sourceRunId               String   @map("source_run_id")
+  status                    String
+  fingerprint               String
+
+  detectedCapabilitiesJson  String?  @map("detected_capabilities_json")
+  missingCapabilitiesJson   String?  @map("missing_capabilities_json")
+  selectorHintsJson         String?  @map("selector_hints_json")
+  metadataJson              String?  @map("metadata_json")
+
+  isActive                  Boolean  @default(true) @map("is_active")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, provider, isActive])
+  @@index([userId, connectionId])
+  @@map("provider_diagnostics_baselines")
+}
+
+model ProviderDiagnosticsDriftAlert {
+  id                          String   @id @default(cuid())
+  userId                      String   @map("user_id")
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider                    String
+  connectionId                String?  @map("connection_id")
+
+  baselineId                  String?  @map("baseline_id")
+  diagnosticsRunId            String   @map("diagnostics_run_id")
+  severity                    String
+  status                      String   @default("open")
+
+  driftScore                  Int      @map("drift_score")
+  summary                     String
+  addedDetectedCapabilitiesJson   String?  @map("added_detected_capabilities_json")
+  removedDetectedCapabilitiesJson String?  @map("removed_detected_capabilities_json")
+  addedMissingCapabilitiesJson    String?  @map("added_missing_capabilities_json")
+  removedMissingCapabilitiesJson  String?  @map("removed_missing_capabilities_json")
+  changedSelectorHintsJson        String?  @map("changed_selector_hints_json")
+  metadataJson                String?  @map("metadata_json")
+
+  notificationEventId         String?  @map("notification_event_id")
+  providerHealthIncidentId    String?  @map("provider_health_incident_id")
+
+  createdAt                   DateTime @default(now()) @map("created_at")
+  resolvedAt                  DateTime? @map("resolved_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, provider, status])
+  @@index([userId, createdAt])
+  @@index([userId, baselineId])
+  @@map("provider_diagnostics_drift_alerts")
+}
+
+model ProviderRecoveryPolicy {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name String
+  enabled Boolean @default(true)
+
+  triggerTypes String @map("trigger_types")
+  providers String?
+  severities String?
+  statuses String?
+
+  actions String
+
+  cooldownMinutes Int @default(60) @map("cooldown_minutes")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+  triggerCount Int @default(0) @map("trigger_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  runs ProviderRecoveryPolicyRun[]
+
+  @@index([userId, enabled])
+  @@map("provider_recovery_policies")
+}
+
+model ProviderRecoveryPolicyRun {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyId String @map("policy_id")
+  policy ProviderRecoveryPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  triggerType String @map("trigger_type")
+  triggerRefId String? @map("trigger_ref_id")
+  provider String?
+  severity String?
+
+  status String
+  actionsAttempted String? @map("actions_attempted")
+  actionsSucceeded String? @map("actions_succeeded")
+  actionsFailed String? @map("actions_failed")
+  skippedReason String? @map("skipped_reason")
+
+  startedAt DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  metadata String?
+
+  @@index([userId, policyId, startedAt])
+  @@index([userId, status])
+  @@map("provider_recovery_policy_runs")
+}
+
+model ProviderRecoveryOverride {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  policyId String? @map("policy_id")
+  policyRunId String? @map("policy_run_id")
+
+  actionType String @map("action_type")
+  provider String?
+  modelId String? @map("model_id")
+  subModelId String? @map("sub_model_id")
+
+  status String @default("active")
+  reason String?
+  safeSummary String? @map("safe_summary")
+
+  previousState String? @map("previous_state")
+  overrideState String? @map("override_state")
+
+  startsAt DateTime @default(now()) @map("starts_at")
+  expiresAt DateTime @map("expires_at")
+  resolvedAt DateTime? @map("resolved_at")
+  resolution String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@index([userId, provider])
+  @@index([userId, expiresAt])
+  @@index([userId, policyRunId])
+  @@map("provider_recovery_overrides")
+}
+
+model SchedulerRunStatus {
+  id String @id @default(cuid())
+  name String @unique
+
+  enabled Boolean
+  lastStartedAt DateTime? @map("last_started_at")
+  lastFinishedAt DateTime? @map("last_finished_at")
+  lastStatus String? @map("last_status")
+  lastError String? @map("last_error")
+
+  lastLockAcquired Boolean? @map("last_lock_acquired")
+  lastSummary String? @map("last_summary")
+
+  runCount Int @default(0) @map("run_count")
+  failureCount Int @default(0) @map("failure_count")
+  skippedCount Int @default(0) @map("skipped_count")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("scheduler_run_statuses")
+}
+
+model ChatThread {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  messages  Message[]
+  jobs      AutomationJob[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@map("chat_threads")
+}
+
+model Message {
+  id           String      @id @default(cuid())
+  threadId     String      @map("thread_id")
+  thread       ChatThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId       String      @map("user_id")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String?
+  role         String
+  content      String
+  metadataJson String?     @map("metadata_json")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@index([threadId, createdAt])
+  @@index([userId, createdAt])
+  @@map("messages")
+}
+
+model AutomationJob {
+  id               String              @id @default(cuid())
+  userId           String              @map("user_id")
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String
+  threadId         String?             @map("thread_id")
+  thread           ChatThread?         @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  status           String              @default("queued")
+  inputJson        String              @map("input_json")
+  outputJson       String?             @map("output_json")
+  errorCode        String?             @map("error_code")
+  errorMessageSafe String?             @map("error_message_safe")
+  startedAt        DateTime?           @map("started_at")
+  completedAt      DateTime?           @map("completed_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  @@index([userId, provider, status])
+  @@index([threadId])
+  @@map("automation_jobs")
+}
+
+model AuditLog {
+  id               String      @id @default(cuid())
+  userId           String      @map("user_id")
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String?
+  action           String
+  result           String
+  requestId        String?     @map("request_id")
+  ipHash           String?     @map("ip_hash")
+  metadataSafeJson String?     @map("metadata_safe_json")
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model InternalApiKey {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  name        String
+  keyPrefix   String    @map("key_prefix")
+  keyLast4    String    @map("key_last4")
+  keyHash     String    @map("key_hash")
+  status      String    @default("active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  rotatedAt   DateTime? @map("rotated_at")
+  rateLimitPerMinute Int? @map("rate_limit_per_minute")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs   InternalApiUsageLog[]
+  modelScopes InternalApiKeyModelScope[]
+
+  @@index([userId])
+  @@index([keyPrefix])
+  @@index([status])
+  @@map("internal_api_keys")
+}
+
+model InternalApiUsageLog {
+  id                String   @id @default(cuid())
+
+  userId            String   @map("user_id")
+  apiKeyId          String?  @map("api_key_id")
+  apiKeyPrefix      String?  @map("api_key_prefix")
+  apiKeyLast4       String?  @map("api_key_last4")
+  apiKeyName        String?  @map("api_key_name")
+
+  model             String
+  provider          String
+  source            String?
+
+  endpoint          String
+  requestId         String   @map("request_id")
+  jobId             String?  @map("job_id")
+
+  status            String
+  errorCode         String?  @map("error_code")
+  errorType         String?  @map("error_type")
+  limitType         String?  @map("limit_type")
+  limitPerMinute    Int?     @map("limit_per_minute")
+
+  stream            Boolean
+  messageCount      Int      @map("message_count")
+  inputCharCount    Int      @map("input_char_count")
+  outputCharCount   Int?     @map("output_char_count")
+
+  durationMs        Int?     @map("duration_ms")
+  queuedMs          Int?     @map("queued_ms")
+  workerDurationMs  Int?     @map("worker_duration_ms")
+
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKey            InternalApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([apiKeyId, createdAt])
+  @@index([model, createdAt])
+  @@index([provider, createdAt])
+  @@index([status, createdAt])
+  @@map("internal_api_usage_logs")
+}
+
+model UserSettings {
+  userId                  String    @id @map("user_id")
+  autoSelectFirstUsable   Boolean   @default(true) @map("auto_select_first_usable")
+  onboardingCompletedAt   DateTime? @map("onboarding_completed_at")
+  onboardingSkippedAt     DateTime? @map("onboarding_skipped_at")
+  onboardingLastStep      String?   @map("onboarding_last_step")
+  notifyProviderSessionIssues Boolean @default(true) @map("notify_provider_session_issues")
+  notifyNoUsableModels    Boolean   @default(true) @map("notify_no_usable_models")
+  notifyProviderLimitSpikes Boolean  @default(true) @map("notify_provider_limit_spikes")
+  providerLimitSpikeThreshold24h Int @default(10) @map("provider_limit_spike_threshold_24h")
+
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_settings")
+}
+
+model UserModelPreference {
+  id                    String   @id @default(cuid())
+  userId                String   @map("user_id")
+  modelId               String   @map("model_id")
+  provider              String
+  enabled               Boolean  @default(true)
+  isDefault             Boolean  @default(false) @map("is_default")
+  priority              Int      @default(100)
+  selectedSubModelId    String?  @default("current") @map("selected_sub_model_id")
+  selectedSubModelLabel String?  @map("selected_sub_model_label")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, modelId])
+  @@index([userId, enabled])
+  @@index([userId, priority])
+  @@map("user_model_preferences")
+}
+
+model ProviderRateLimitSetting {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  provider          String
+  requestsPerMinute Int?     @map("requests_per_minute")
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([provider])
+  @@map("provider_rate_limit_settings")
+}
+
+model InternalApiKeyModelScope {
+  id        String   @id @default(cuid())
+  apiKeyId  String   @map("api_key_id")
+  modelId   String   @map("model_id")
+  provider  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  apiKey   InternalApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, modelId])
+  @@index([apiKeyId])
+  @@index([modelId])
+  @@map("internal_api_key_model_scopes")
+}
+
+model NotificationEvent {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  kind        String
+  severity    String
+  title       String
+  message     String
+  provider    String?
+  modelId     String?   @map("model_id")
+  fingerprint String
+  actionLabel String?   @map("action_label")
+  actionHref  String?   @map("action_href")
+  metadataJson String?  @map("metadata_json")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAttempts NotificationDeliveryAttempt[]
+  deadLetters NotificationDeadLetter[]
+
+  @@unique([userId, fingerprint])
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([userId, kind])
+  @@map("notification_events")
+}
+
+model NotificationDeliveryPreference {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  channel   String
+  enabled   Boolean  @default(false)
+  configJson String? @map("config_json")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("notification_delivery_preferences")
+}
+
+model NotificationDeliveryAttempt {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  notificationEventId String @map("notification_event_id")
+  channel         String
+  status          String
+  errorCode       String?  @map("error_code")
+  attemptedAt     DateTime @default(now()) @map("attempted_at")
+  metadataJson    String?  @map("metadata_json")
+
+  attemptNumber   Int      @default(1) @map("attempt_number")
+  retryable       Boolean  @default(false)
+  nextRetryAt     DateTime? @map("next_retry_at")
+  jobId           String?  @map("job_id")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationEvent NotificationEvent @relation(fields: [notificationEventId], references: [id], onDelete: Cascade)
+  deadLetters     NotificationDeadLetter[]
+
+  @@index([userId, attemptedAt])
+  @@index([notificationEventId])
+  @@index([userId, channel])
+  @@map("notification_delivery_attempts")
+}
+
+model ProviderLiveSubModelCache {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  provider      String
+  subModelsJson String   @map("sub_models_json")
+  detectedAt    DateTime @map("detected_at")
+  status        String
+  errorCode     String?  @map("error_code")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, detectedAt])
+  @@map("provider_live_sub_model_cache")
+}
+
+model NotificationDeadLetter {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  notificationEventId String @map("notification_event_id")
+  deliveryAttemptId String? @map("delivery_attempt_id")
+  channel String
+  reason String
+  failureCode String? @map("failure_code")
+  retryable Boolean @default(true)
+  firstFailedAt DateTime @map("first_failed_at")
+  deadLetteredAt DateTime @default(now()) @map("dead_lettered_at")
+  lastRetryAt DateTime? @map("last_retry_at")
+  resolvedAt DateTime? @map("resolved_at")
+  retryCount Int @default(0) @map("retry_count")
+  metadataJson String? @map("metadata_json")
+  status String @default("open")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationEvent NotificationEvent @relation(fields: [notificationEventId], references: [id], onDelete: Cascade)
+  deliveryAttempt NotificationDeliveryAttempt? @relation(fields: [deliveryAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([userId, deadLetteredAt])
+  @@index([userId, channel])
+  @@index([userId, notificationEventId])
+  @@index([userId, status])
+  @@map("notification_dead_letters")
+}
+
+model NotificationWebhookDestination {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  name String
+  enabled Boolean @default(true)
+
+  encryptedUrl String @map("encrypted_url")
+  encryptedSigningSecret String @map("encrypted_signing_secret")
+
+  priority Int @default(100)
+  isDefault Boolean @default(false) @map("is_default")
+
+  routeKinds String? @map("route_kinds") // JSON array
+  routeSeverities String? @map("route_severities") // JSON array
+  routePriorities String? @map("route_priorities") // JSON array
+
+  failoverEnabled Boolean @default(true) @map("failover_enabled")
+  maxAttempts Int? @map("max_attempts")
+  timeoutMs Int? @map("timeout_ms")
+
+  payloadFormat     String  @default("uaiw_default") @map("payload_format")
+  payloadFields     String? @map("payload_fields")    // JSON array of allowlisted field keys
+  includeActionHref Boolean @default(true) @map("include_action_href")
+  includeDeliveryMetadata Boolean @default(true) @map("include_delivery_metadata")
+  includeRoutingMetadata Boolean @default(true) @map("include_routing_metadata")
+
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastFailureAt DateTime? @map("last_failure_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, enabled])
+  @@index([userId, priority])
+  @@map("notification_webhook_destinations")
+}
+
+model ProviderHealthIncident {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  provider            String
+  connectionId        String?   @map("connection_id")
+
+  status              String
+  previousStatus      String?   @map("previous_status")
+  severity            String    @default("info")
+  reason              String?
+  fingerprint         String
+
+  startedAt           DateTime  @default(now()) @map("started_at")
+  lastSeenAt          DateTime  @default(now()) @map("last_seen_at")
+  resolvedAt          DateTime? @map("resolved_at")
+  occurrenceCount     Int       @default(1) @map("occurrence_count")
+
+  notificationEventId String?   @map("notification_event_id")
+  metadata            String?   // JSON representation
+
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, startedAt])
+  @@index([userId, status])
+  @@index([userId, resolvedAt])
+  @@map("provider_health_incidents")
+}
+
+model ProviderDiagnosticsRun {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  provider String
+  connectionId String? @map("connection_id")
+  incidentId String? @map("incident_id")
+
+  status String
+  summary String?
+  reason String?
+  severity String @default("info")
+
+  detectedCapabilitiesJson String? @map("detected_capabilities_json")
+  missingCapabilitiesJson String? @map("missing_capabilities_json")
+  selectorHintsJson String? @map("selector_hints_json")
+  redactionStatsJson String? @map("redaction_stats_json")
+  metadataJson String? @map("metadata_json")
+
+  startedAt DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  durationMs Int? @map("duration_ms")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, startedAt])
+  @@index([userId, incidentId])
+  @@index([userId, status])
+  @@map("provider_diagnostics_runs")
+}

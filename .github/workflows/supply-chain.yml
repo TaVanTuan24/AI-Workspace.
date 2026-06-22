@@ -1,0 +1,117 @@
+name: Supply Chain Scaffold
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to package and sign"
+        required: true
+      generate_sbom:
+        description: "Generate SBOM for the release"
+        type: boolean
+        default: true
+      sign_artifacts:
+        description: "Sign the release checksums.sha256"
+        type: boolean
+        default: false
+      sign_images:
+        description: "Sign the published Docker images (Not fully implemented)"
+        type: boolean
+        default: false
+      security_scan:
+        description: "Run vulnerability/license security scan"
+        type: boolean
+        default: true
+      strict_security:
+        description: "Fail on high vulnerabilities and review licenses"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write  # Needed for Cosign OIDC Keyless signing
+  packages: write
+
+jobs:
+  supply-chain:
+    name: Build, Package, and Sign
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ github.event.inputs.version }}
+      BUILD_SOURCE: ci
+      GIT_SHA: ${{ github.sha }}
+      BUILD_TIME: ${{ github.event.repository.updated_at }}
+      NODE_ENV: test
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Run Release Checks
+        run: corepack pnpm release:check
+
+      - name: Security Scan
+        if: ${{ github.event.inputs.security_scan == 'true' }}
+        run: |
+          if [ "${{ github.event.inputs.strict_security }}" == "true" ]; then
+            corepack pnpm security:scan --strict
+          else
+            corepack pnpm security:scan
+          fi
+
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: dist-security/
+
+      - name: Package Release
+        run: corepack pnpm release:package
+
+      - name: Generate SBOM
+        if: ${{ github.event.inputs.generate_sbom == 'true' }}
+        run: corepack pnpm release:sbom
+
+      - name: Verify Release
+        run: |
+          if [ "${{ github.event.inputs.generate_sbom }}" == "true" ]; then
+            corepack pnpm release:verify --require-sbom
+          else
+            corepack pnpm release:verify
+          fi
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: dist-release/unified-ai-workspace-${{ github.event.inputs.version }}/
+
+      - name: Setup Cosign
+        if: ${{ github.event.inputs.sign_artifacts == 'true' || github.event.inputs.sign_images == 'true' }}
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Sign Release Artifacts
+        if: ${{ github.event.inputs.sign_artifacts == 'true' }}
+        run: |
+          echo "Signing checksums.sha256 using keyless signing"
+          cd dist-release/unified-ai-workspace-${{ github.event.inputs.version }}
+          cosign sign-blob checksums.sha256 --yes --output-signature checksums.sha256.sig
+
+      - name: Sign Docker Images
+        if: ${{ github.event.inputs.sign_images == 'true' }}
+        run: |
+          echo "Image signing scaffold."
+          echo "To sign images, you would run:"
+          echo "cosign sign ghcr.io/${{ github.repository_owner }}/unified-ai-workspace-api:${{ github.event.inputs.version }}"
+          echo "This step currently skips real signing because images might not be published yet."

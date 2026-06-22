@@ -1,0 +1,84 @@
+name: Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to package, e.g. 0.2.0"
+        required: true
+        type: string
+      staging_verified:
+        description: "Confirm staging verification has passed"
+        required: true
+        type: boolean
+        default: false
+      build_images:
+        description: "Build Docker images locally in CI without pushing"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build Release Package
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ inputs.version }}
+      BUILD_SOURCE: ci
+      GIT_SHA: ${{ github.sha }}
+      BUILD_TIME: ${{ github.event.repository.updated_at }}
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require staging verification
+        run: |
+          if [ "${{ inputs.staging_verified }}" != "true" ]; then
+            echo "staging_verified must be true before packaging a release artifact."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: CI check without Docker
+        run: corepack pnpm ci:check -- --skip-docker
+
+      - name: Release check
+        run: corepack pnpm release:check
+
+      - name: Generate release notes
+        run: corepack pnpm release:notes
+
+      - name: Package release
+        run: corepack pnpm release:package
+
+      - name: Generate SBOM
+        run: corepack pnpm release:sbom
+
+      - name: Verify release package
+        run: corepack pnpm release:verify --require-sbom
+
+      - name: Build Docker images
+        if: inputs.build_images
+        run: docker compose build api worker web
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-ai-workspace-${{ inputs.version }}
+          path: dist-release/unified-ai-workspace-${{ inputs.version }}
+          if-no-files-found: error

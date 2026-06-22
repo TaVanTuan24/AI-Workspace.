@@ -1,0 +1,22 @@
+{
+  "provider": "gemini",
+  "mode": "full",
+  "status": "fail",
+  "startedAt": "2026-06-21T08:04:05.681Z",
+  "durationMs": 28,
+  "checks": [
+    {
+      "name": "provider_registered",
+      "status": "pass"
+    },
+    {
+      "name": "smoke_error",
+      "status": "fail",
+      "message": "Provider smoke test failed."
+    }
+  ],
+  "reportVersion": 1,
+  "safe": true,
+  "errorCode": "SMOKE_FAILED",
+  "errorMessage": "Provider smoke test failed."
+}

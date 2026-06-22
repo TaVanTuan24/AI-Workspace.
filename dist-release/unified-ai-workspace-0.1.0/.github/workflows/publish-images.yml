@@ -1,0 +1,113 @@
+name: Publish Docker Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version, e.g. 0.1.0"
+        required: true
+      registry:
+        description: "Container registry"
+        default: "ghcr.io"
+        required: true
+      image_namespace:
+        description: "Image namespace, e.g. owner/unified-ai-workspace"
+        required: true
+      push:
+        description: "Push images to registry"
+        type: boolean
+        default: false
+      tag_latest:
+        description: "Also tag images as latest"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate build and checks
+        run: pnpm ci:check --skip-docker
+
+      - name: Generate tags
+        id: tags
+        run: |
+          TAGS_JSON=$(node tools/release/image-tags.mjs \
+            --registry "${{ github.event.inputs.registry }}" \
+            --namespace "${{ github.event.inputs.image_namespace }}" \
+            --version "${{ github.event.inputs.version }}" \
+            --sha "${GITHUB_SHA::7}" \
+            ${{ github.event.inputs.tag_latest == 'true' && '--latest' || '' }})
+          
+          # Write json to env for later steps
+          echo "api_tags=$(echo "$TAGS_JSON" | jq -r '.api | join(",")')" >> $GITHUB_ENV
+          echo "worker_tags=$(echo "$TAGS_JSON" | jq -r '.worker | join(",")')" >> $GITHUB_ENV
+          echo "web_tags=$(echo "$TAGS_JSON" | jq -r '.web | join(",")')" >> $GITHUB_ENV
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        if: ${{ github.event.inputs.push == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ github.event.inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: ${{ github.event.inputs.push == 'true' }}
+          tags: ${{ env.api_tags }}
+          build-args: |
+            APP_VERSION=${{ github.event.inputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+            BUILD_SOURCE=ci
+
+      - name: Build and push Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/worker.Dockerfile
+          push: ${{ github.event.inputs.push == 'true' }}
+          tags: ${{ env.worker_tags }}
+          build-args: |
+            APP_VERSION=${{ github.event.inputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+            BUILD_SOURCE=ci
+
+      - name: Build and push Web
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: ${{ github.event.inputs.push == 'true' }}
+          tags: ${{ env.web_tags }}
+          build-args: |
+            APP_VERSION=${{ github.event.inputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+            BUILD_SOURCE=ci

@@ -1,0 +1,21 @@
+{
+  "name": "@uaiw/provider-adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@uaiw/shared": "workspace:*",
+    "playwright": "^1.45.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vitest": "^2.1.9"
+  }
+}
