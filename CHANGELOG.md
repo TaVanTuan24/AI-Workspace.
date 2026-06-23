@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 - 2026-06-23
+
+Please see the [Release Notes for 0.3.0](docs/RELEASE_NOTES_0.3.0.md) for full details on Workspace Governance & Admin Observability.
+
 ## 0.2.0 - 2026-06-22
 
 ### Security & Supply Chain

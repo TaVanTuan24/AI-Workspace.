@@ -35,6 +35,8 @@ model Workspace {
   invites                        WorkspaceInvite[]
   userRoleAuditEvents            UserRoleAuditEvent[]
   inviteDeliveryAttempts         WorkspaceInviteDeliveryAttempt[]
+  quota                          WorkspaceQuota?
+  quotaEvents                    WorkspaceQuotaEvent[]
 
   @@map("workspaces")
 }
@@ -326,6 +328,47 @@ model Message {
   @@map("messages")
 }
 
+model WorkspaceQuota {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique @map("workspace_id")
+  plan        String   @default("local")
+
+  maxMembers              Int? @map("max_members")
+  maxInvites              Int? @map("max_invites")
+  maxApiKeys              Int? @map("max_api_keys")
+  maxProviderConnections  Int? @map("max_provider_connections")
+  maxWebhookDestinations  Int? @map("max_webhook_destinations")
+  maxRecoveryPolicies     Int? @map("max_recovery_policies")
+  maxDiagnosticsBaselines Int? @map("max_diagnostics_baselines")
+  maxMonthlyApiRequests   Int? @map("max_monthly_api_requests")
+  maxMonthlyInviteEmails  Int? @map("max_monthly_invite_emails")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_quotas")
+}
+
+model WorkspaceQuotaEvent {
+  id                 String   @id @default(cuid())
+  workspaceId        String   @map("workspace_id")
+  actorUserId        String?  @map("actor_user_id")
+  resource           String
+  limit              Int?
+  used               Int
+  attemptedIncrement Int      @default(1) @map("attempted_increment")
+  source             String
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, resource, createdAt])
+  @@map("workspace_quota_events")
+}
+
 model AutomationJob {
   id               String      @id @default(cuid())
   userId           String      @map("user_id")
@@ -475,6 +518,9 @@ model UserSettings {
   notifyNoUsableModels           Boolean   @default(true) @map("notify_no_usable_models")
   notifyProviderLimitSpikes      Boolean   @default(true) @map("notify_provider_limit_spikes")
   providerLimitSpikeThreshold24h Int       @default(10) @map("provider_limit_spike_threshold_24h")
+  notifyWorkspaceQuotaWarnings   Boolean   @default(true) @map("notify_workspace_quota_warnings")
+  notifyWorkspaceQuotaExceeded   Boolean   @default(true) @map("notify_workspace_quota_exceeded")
+  workspaceQuotaWarningThresholdPercent Int @default(90) @map("workspace_quota_warning_threshold_percent")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

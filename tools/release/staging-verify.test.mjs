@@ -22,8 +22,8 @@ describe("staging-verify", () => {
 
       if (req.url === "/health") return json(res, 200, { ok: true });
       if (req.url === "/ready") return json(res, 200, { ok: true });
-      if (req.url === "/health/details") return json(res, 200, { ok: true, version: "0.2.0", buildSource: "test" });
-      if (req.url === "/version") return json(res, 200, { version: "0.2.0" });
+      if (req.url === "/health/details") return json(res, 200, { ok: true, version: "0.3.0", buildSource: "test" });
+      if (req.url === "/version") return json(res, 200, { version: "0.3.0" });
       if (req.url === "/bad-version") return json(res, 200, { version: "0.1.0" });
       if (req.url === "/secret") return json(res, 200, { storageState: {} });
       if (req.url === "/v1/models") return json(res, 200, { object: "list", data: [] });
@@ -32,6 +32,12 @@ describe("staging-verify", () => {
       if (req.url === "/settings/provider-health/incidents?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/provider-health/diagnostics-runs?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/notification-delivery/dead-letters?limit=10") return json(res, 200, { deadLetters: [] });
+      if (req.url === "/settings/workspace/admin-overview") return json(res, 200, { overview: {} });
+      if (req.url === "/settings/workspace/activity") return json(res, 200, { data: [] });
+      if (req.url === "/settings/workspace/schedulers") return json(res, 200, { schedulers: [] });
+      if (req.url === "/settings/workspace/quota") return json(res, 200, { quota: {} });
+      if (req.url === "/settings/workspace/quota/report") return json(res, 200, { report: {} });
+      if (req.url === "/settings/workspace/invites/email-delivery-status") return json(res, 200, { stats: {} });
 
       return json(res, 404, { error: "not found" });
     });
@@ -48,7 +54,7 @@ describe("staging-verify", () => {
   it("passes health, version, models, and settings checks against a local server", async () => {
     const report = await verifyStaging({
       baseUrl,
-      expectedVersion: "0.2.0",
+      expectedVersion: "0.3.0",
       apiKey: "test-secret-key",
       localUserId: "release-qa"
     });
@@ -70,12 +76,12 @@ describe("staging-verify", () => {
     const address = mismatchServer.address();
     const report = await verifyStaging({
       baseUrl: `http://127.0.0.1:${address.port}`,
-      expectedVersion: "0.2.0"
+      expectedVersion: "0.3.0"
     });
     await new Promise((resolve) => mismatchServer.close(resolve));
 
     assert.equal(report.result, "fail");
-    assert.match(report.checks.find((check) => check.name === "version").reason, /Expected version 0\.2\.0/);
+    assert.match(report.checks.find((check) => check.name === "version").reason, /Expected version 0\.3\.0/);
   });
 
   it("rejects sensitive-looking response fields", () => {
@@ -94,7 +100,7 @@ describe("staging-verify", () => {
     const address = unavailableServer.address();
     const report = await verifyStaging({
       baseUrl: `http://127.0.0.1:${address.port}`,
-      expectedVersion: "0.2.0"
+      expectedVersion: "0.3.0"
     });
     await new Promise((resolve) => unavailableServer.close(resolve));
 
@@ -103,7 +109,7 @@ describe("staging-verify", () => {
   });
 
   it("skips settings checks without a local user id", async () => {
-    const report = await verifyStaging({ baseUrl, expectedVersion: "0.2.0" });
+    const report = await verifyStaging({ baseUrl, expectedVersion: "0.3.0" });
     const settings = report.checks.find((check) => check.name === "settings-safe-checks");
 
     assert.equal(settings.status, "skip");

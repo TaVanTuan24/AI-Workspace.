@@ -7,7 +7,7 @@ import { normalizePath, root } from "./lib.mjs";
 import { readDockerPreflightStatus } from "./docker-preflight.mjs";
 
 const DEFAULT_ENV_FILE = ".env.staging";
-const HANDOFF_DOC = "docs/RELEASE_OPERATOR_HANDOFF_0.2.0.md";
+const HANDOFF_DOC = "docs/RELEASE_OPERATOR_HANDOFF_0.3.0.md";
 
 export function parseArgs(argv) {
   const options = {
@@ -38,8 +38,8 @@ export function parseArgs(argv) {
 export function usage() {
   return [
     "Usage:",
-    "  corepack pnpm release:operator:status --version 0.2.0 --release-dir dist-release/unified-ai-workspace-0.2.0",
-    "  corepack pnpm release:operator:status --version 0.2.0 --release-dir dist-release/unified-ai-workspace-0.2.0 --strict --require-cosign",
+    "  corepack pnpm release:operator:status --version 0.3.0 --release-dir dist-release/unified-ai-workspace-0.3.0",
+    "  corepack pnpm release:operator:status --version 0.3.0 --release-dir dist-release/unified-ai-workspace-0.3.0 --strict --require-cosign",
     "",
     "This command reports release handoff status only. It does not tag, push, sign, publish, run provider logins, or print secrets."
   ].join("\n");
@@ -90,8 +90,7 @@ export async function runOperatorStatus(options, deps = {}) {
 
   for (const docPath of [
     "docs/THIRD_PARTY_LICENSE_NOTICES.md",
-    "docs/UPGRADE-0.2.0.md",
-    "docs/RELEASE_TAG_CHECKLIST_0.2.0.md",
+    "docs/UPGRADE-0.3.0.md",
     HANDOFF_DOC
   ]) {
     add(rows, docPath, await pathExists(path.join(root, docPath)) ? "pass" : "fail");
@@ -137,7 +136,7 @@ function nextAction({ rows, preflight, markerExists, cosignAvailable, git, versi
     return "Run `corepack pnpm release:staging:env --out .env.staging`, then inspect it locally without pasting secrets.";
   }
   if (!markerExists && preflight.ok && preflight.content?.dockerDaemon === "unavailable") {
-    return "Start Docker Desktop/Linux Engine, wait for `docker info`, then rerun `corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0 --base-url http://localhost:4000 --down`.";
+    return "Start Docker Desktop/Linux Engine, wait for `docker info`, then rerun `corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0 --base-url http://localhost:4000 --down`.";
   }
   if (!markerExists) {
     return "Run real local staging smoke to generate `staging-verification.json`.";

@@ -28,6 +28,8 @@ const envSchema = z.object({
   ENABLE_DB_API_KEYS: z.coerce.boolean().default(false),
   API_USAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   NOTIFICATION_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  WORKSPACE_QUOTA_EVENT_RETENTION_DAYS: z.coerce.number().int().min(7).default(180),
+  WORKSPACE_QUOTA_EVENT_CLEANUP_BATCH_SIZE: z.coerce.number().int().positive().default(1000),
   PROVIDER_HEALTH_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   PROVIDER_HEALTH_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   PROVIDER_HEALTH_SCHEDULER_ENABLED: z.coerce.boolean().default(false),
@@ -40,8 +42,20 @@ const envSchema = z.object({
   WORKSPACE_INVITE_EXPIRY_INTERVAL_SECONDS: z.coerce.number().default(3600),
   WORKSPACE_INVITE_EXPIRY_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   WORKSPACE_INVITE_EXPIRY_MAX_PER_RUN: z.coerce.number().int().min(1).default(100),
+  WORKSPACE_QUOTA_ALERT_SCHEDULER_ENABLED: z.coerce.boolean().default(true),
+  WORKSPACE_QUOTA_ALERT_INTERVAL_SECONDS: z.coerce.number().default(3600),
+  WORKSPACE_QUOTA_ALERT_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+  WORKSPACE_QUOTA_ALERT_MAX_WORKSPACES_PER_RUN: z.coerce.number().int().min(1).default(500),
   WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED: z.coerce.boolean().default(false),
-  WORKSPACE_INVITE_EMAIL_CHANNEL: z.string().default("email_noop"),
+  WORKSPACE_INVITE_EMAIL_PROVIDER: z.enum(["noop", "console_dry_run", "smtp"]).default("noop"),
+  WORKSPACE_INVITE_EMAIL_ALLOW_REAL_SEND: z.coerce.boolean().default(false),
+  WORKSPACE_INVITE_EMAIL_FROM: z.string().optional(),
+  WORKSPACE_INVITE_EMAIL_DRY_RUN: z.coerce.boolean().default(true),
+  WORKSPACE_INVITE_SMTP_HOST: z.string().optional(),
+  WORKSPACE_INVITE_SMTP_PORT: z.coerce.number().optional(),
+  WORKSPACE_INVITE_SMTP_SECURE: z.coerce.boolean().default(false),
+  WORKSPACE_INVITE_SMTP_USER: z.string().optional(),
+  WORKSPACE_INVITE_SMTP_PASSWORD: z.string().optional(),
   WORKSPACE_INVITE_BASE_URL: z.string().optional(),
   PROVIDER_RECOVERY_OVERRIDE_EXPIRY_INTERVAL_SECONDS: z.coerce.number().int().min(60).default(300),
   PROVIDER_RECOVERY_OVERRIDE_EXPIRY_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(120),
@@ -82,6 +96,9 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
       (raw.NODE_ENV === "production" ? "true" : undefined),
     WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED:
       raw.WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED ??
+      (raw.NODE_ENV === "test" ? "false" : "true"),
+    WORKSPACE_QUOTA_ALERT_SCHEDULER_ENABLED:
+      raw.WORKSPACE_QUOTA_ALERT_SCHEDULER_ENABLED ??
       (raw.NODE_ENV === "test" ? "false" : "true")
   });
   const errors: string[] = [];
@@ -126,10 +143,33 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
     parsed.WORKSPACE_INVITE_EXPIRY_LOCK_TTL_SECONDS = parsed.WORKSPACE_INVITE_EXPIRY_INTERVAL_SECONDS;
   }
 
+  if (parsed.WORKSPACE_QUOTA_ALERT_LOCK_TTL_SECONDS > parsed.WORKSPACE_QUOTA_ALERT_INTERVAL_SECONDS) {
+    warn("WORKSPACE_QUOTA_ALERT_LOCK_TTL_SECONDS is greater than the scheduler interval; clamping lock TTL to the interval.");
+    parsed.WORKSPACE_QUOTA_ALERT_LOCK_TTL_SECONDS = parsed.WORKSPACE_QUOTA_ALERT_INTERVAL_SECONDS;
+  }
+
   validateSessionMasterKey(raw.SESSION_MASTER_KEY, isProduction, shouldWarn, errors, warn);
 
   if (parsed.NOTIFICATION_SECRET_ENCRYPTION_KEY) {
     validateSecret("NOTIFICATION_SECRET_ENCRYPTION_KEY", parsed.NOTIFICATION_SECRET_ENCRYPTION_KEY, isProduction, shouldWarn, errors, warn, 32);
+  }
+
+  if (parsed.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED) {
+    if (parsed.WORKSPACE_INVITE_EMAIL_PROVIDER === "smtp") {
+      if (!parsed.WORKSPACE_INVITE_SMTP_HOST) {
+        errors.push("WORKSPACE_INVITE_SMTP_HOST is required when using smtp provider.");
+      }
+      if (!parsed.WORKSPACE_INVITE_SMTP_PORT) {
+        errors.push("WORKSPACE_INVITE_SMTP_PORT is required when using smtp provider.");
+      }
+      if (!parsed.WORKSPACE_INVITE_EMAIL_FROM) {
+        errors.push("WORKSPACE_INVITE_EMAIL_FROM is required when using smtp provider.");
+      }
+    }
+  }
+
+  if (parsed.NODE_ENV === "test" && parsed.WORKSPACE_INVITE_EMAIL_ALLOW_REAL_SEND) {
+    errors.push("Real email send cannot be enabled in test environment.");
   }
 
   if (parsed.NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS < parsed.NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS) {

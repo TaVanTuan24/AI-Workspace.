@@ -325,6 +325,19 @@ export interface WorkspaceInviteEmailPreview {
   html?: string;
 }
 
+export interface WorkspaceInviteEmailDeliveryStatus {
+  enabled: boolean;
+  provider: "noop" | "console_dry_run" | "smtp";
+  dryRun: boolean;
+  allowRealSend: boolean;
+  canAttemptSend: boolean;
+  realSendPossible: boolean;
+  missingRequiredConfig: string[];
+  warnings: string[];
+  fromConfigured: boolean;
+  baseUrlConfigured: boolean;
+}
+
 export interface CreateWorkspaceInviteResult {
   invite: WorkspaceInvite;
   token: string;
@@ -395,6 +408,40 @@ export async function acceptWorkspaceInvite(token: string): Promise<{ workspaceI
     body: JSON.stringify({ token })
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to accept invite"));
+  return response.json();
+}
+
+export interface WorkspaceInviteDeliveryAttempt {
+  id: string;
+  channel: string;
+  provider: string;
+  status: string;
+  recipientEmailRedacted?: string;
+  reason?: string;
+  createdAt: string;
+}
+
+export async function getWorkspaceInviteDeliveryAttempts(inviteId: string): Promise<{ attempts: WorkspaceInviteDeliveryAttempt[] }> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/invites/${inviteId}/delivery-attempts`, {
+    headers: { "x-local-user-id": "local-user" }
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to get delivery attempts"));
+  return response.json();
+}
+
+export async function sendWorkspaceInviteDeliveryTest(input: {
+  email?: string;
+  allowRealSendTest?: boolean;
+}): Promise<{ status: string; provider: string; testSubject?: string; error?: string }> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/invites/email-delivery-test`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-local-user-id": "local-user"
+    },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to run delivery test"));
   return response.json();
 }
 
@@ -472,6 +519,15 @@ export async function getWorkspaceInviteExpirySchedulerStatus(): Promise<Schedul
     cache: "no-store"
   });
   if (!response.ok) throw new Error("Failed to get invite expiry scheduler status");
+  return response.json();
+}
+
+export async function getWorkspaceInviteEmailDeliveryStatus(): Promise<WorkspaceInviteEmailDeliveryStatus> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/invites/email-delivery-status`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to get email delivery status"));
   return response.json();
 }
 
@@ -808,6 +864,36 @@ export async function getProviderRecoverySchedulerStatus(): Promise<{ data: Reco
   return response.json();
 }
 
+export interface WorkspaceQuotaAlertSchedulerStatus {
+  enabled: boolean;
+  intervalSeconds: number;
+  maxWorkspacesPerRun: number;
+  lockTtlSeconds: number;
+  lastStartedAt?: string;
+  lastFinishedAt?: string;
+  lastStatus?: string;
+  lastSummary?: {
+    scannedWorkspaces?: number;
+    warningsCreated?: number;
+    exceededCreated?: number;
+    skipped?: number;
+    lock?: string;
+    source?: "scheduler" | "cli";
+  } | null;
+  runCount: number;
+  failureCount: number;
+  skippedCount: number;
+}
+
+export async function getWorkspaceQuotaAlertSchedulerStatus(): Promise<WorkspaceQuotaAlertSchedulerStatus> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota/alert-scheduler-status`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error("Failed to load workspace quota alert scheduler status");
+  return response.json();
+}
+
 export async function createProviderRecoveryPolicy(input: ProviderRecoveryPolicyInput): Promise<{ data: ProviderRecoveryPolicyView }> {
   const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies`, {
     method: "POST",
@@ -923,6 +1009,9 @@ export interface NotificationPreferences {
   notifyNoUsableModels: boolean;
   notifyProviderLimitSpikes: boolean;
   providerLimitSpikeThreshold24h: number;
+  notifyWorkspaceQuotaWarnings: boolean;
+  notifyWorkspaceQuotaExceeded: boolean;
+  workspaceQuotaWarningThresholdPercent: number;
 }
 
 export async function getNotificationPreferences(): Promise<{ preferences: NotificationPreferences }> {
@@ -1829,4 +1918,277 @@ export async function previewWebhookPayload(id: string, sampleData?: any): Promi
     throw new Error(err.error || "Failed to preview payload");
   }
   return response.json();
+}
+
+export type WorkspaceQuotaResource =
+  | "members"
+  | "pendingInvites"
+  | "apiKeys"
+  | "providerConnections"
+  | "webhookDestinations"
+  | "recoveryPolicies"
+  | "diagnosticsBaselines"
+  | "monthlyApiRequests"
+  | "monthlyInviteEmails";
+
+export interface WorkspaceQuotaStatus {
+  resource: WorkspaceQuotaResource;
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  exceeded: boolean;
+}
+
+export interface WorkspaceUsageSummary {
+  plan: string;
+  quotas: WorkspaceQuotaStatus[];
+}
+
+export interface WorkspaceQuotaEvent {
+  id: string;
+  resource: string;
+  source: string;
+  limit: number | null;
+  used: number;
+  attemptedIncrement: number;
+  createdAt: string;
+}
+
+export interface UpdateQuotaPatch {
+  maxMembers?: number | null;
+  maxInvites?: number | null;
+  maxApiKeys?: number | null;
+  maxProviderConnections?: number | null;
+  maxWebhookDestinations?: number | null;
+  maxRecoveryPolicies?: number | null;
+  maxDiagnosticsBaselines?: number | null;
+  maxMonthlyApiRequests?: number | null;
+  maxMonthlyInviteEmails?: number | null;
+}
+
+export async function getWorkspaceQuotaSummary(): Promise<WorkspaceUsageSummary> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to load quota summary"));
+  }
+  return response.json();
+}
+
+export async function updateWorkspaceQuota(patch: UpdateQuotaPatch): Promise<WorkspaceUsageSummary> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-local-user-id": "local-user"
+    },
+    body: JSON.stringify(patch)
+  });
+  if (!response.ok) throw new Error("Failed to update workspace quota");
+  return response.json();
+}
+
+export interface WorkspaceQuotaReport {
+  workspace: { id: string; name: string; slug?: string };
+  range: "24h" | "7d" | "30d" | "90d";
+  generatedAt: string;
+  quotas: Array<{
+    resource: string;
+    limit: number | null;
+    used: number;
+    remaining: number | null;
+    exceeded: boolean;
+  }>;
+  eventsByResource: Array<{ resource: string; count: number }>;
+  eventsBySource: Array<{ source: string; count: number }>;
+  recentEvents: Array<{
+    resource: string;
+    source: string;
+    limit: number | null;
+    used: number;
+    attemptedIncrement: number;
+    createdAt: string;
+  }>;
+}
+
+export async function getWorkspaceQuotaReport(range: "24h" | "7d" | "30d" | "90d"): Promise<WorkspaceQuotaReport> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota/report?range=${range}`, {
+    headers: { "x-local-user-id": "local-user" }
+  });
+  if (!response.ok) throw new Error("Failed to load workspace quota report");
+  return response.json();
+}
+
+export function getWorkspaceQuotaReportDownloadUrl(range: "24h" | "7d" | "30d" | "90d"): string {
+  return `${API_BASE_URL}/settings/workspace/quota/report/download?range=${range}`;
+}
+
+export interface QuotaPreset {
+  label: string;
+  description?: string;
+  quotas: Record<string, number | null>;
+}
+
+export async function getWorkspaceQuotaPresets(): Promise<{ presets: Record<string, QuotaPreset> }> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota/presets`, {
+    headers: { "x-local-user-id": "local-user" }
+  });
+  if (!response.ok) throw new Error("Failed to load workspace quota presets");
+  return response.json();
+}
+
+export async function applyWorkspaceQuotaPreset(preset: string, confirmExceeded?: boolean): Promise<{ success: boolean; warning?: string; exceededResources?: any[] }> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/quota/presets/apply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-local-user-id": "local-user"
+    },
+    body: JSON.stringify({ preset, confirmExceeded })
+  });
+  
+  if (!response.ok && response.status === 400) {
+    const errorData = await response.json().catch(() => null);
+    if (errorData?.error === "quota_preset_would_exceed_usage") {
+      throw { ...errorData, isExceededWarning: true };
+    }
+  }
+  
+  if (!response.ok) throw new Error("Failed to apply workspace quota preset");
+  return response.json();
+}
+
+export async function getWorkspaceQuotaEvents(params?: { resource?: string; limit?: number }): Promise<{ events: WorkspaceQuotaEvent[] }> {
+  const url = new URL(`${API_BASE_URL}/settings/workspace/quota/events`);
+  if (params?.resource) url.searchParams.set("resource", params.resource);
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+
+  const response = await fetch(url.toString(), {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to load quota events"));
+  }
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Workspace Activity Timeline
+// ---------------------------------------------------------------------------
+
+export type ActivityCategory =
+  | "membership" | "invite" | "invite_delivery" | "quota" | "notification"
+  | "scheduler" | "provider_health" | "diagnostics" | "recovery" | "webhook" | "api_usage";
+
+export interface ActivityEvent {
+  id: string;
+  category: ActivityCategory;
+  action: string;
+  severity?: "info" | "warning" | "error" | "critical";
+  title: string;
+  summary: string;
+  metadata?: Record<string, string | number | boolean | null>;
+  createdAt: string;
+  actorUserId?: string | null;
+  targetUserId?: string | null;
+}
+
+export interface ActivityTimelineResponse {
+  events: ActivityEvent[];
+  nextCursor?: string;
+}
+
+export async function getWorkspaceActivity(params?: {
+  range?: string;
+  category?: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<ActivityTimelineResponse> {
+  const url = new URL(`${API_BASE_URL}/settings/workspace/activity`);
+  if (params?.range) url.searchParams.set("range", params.range);
+  if (params?.category) url.searchParams.set("category", params.category);
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+  if (params?.cursor) url.searchParams.set("cursor", params.cursor);
+
+  const response = await fetch(url.toString(), {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load activity"));
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Workspace Admin Overview
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceAdminOverview {
+  workspace: { id: string; name: string; slug?: string };
+  members: { active: number; disabled: number; pendingInvites: number };
+  quotas: { exceeded: number; nearLimit: number };
+  schedulers: Array<{ name: string; enabled: boolean; lastStatus?: string; lastFinishedAt?: string }>;
+  notifications: { unread: number; criticalRecent: number };
+  providers: { usable: number; requiresAttention: number };
+  emailDelivery: { enabled: boolean; provider: string; dryRun: boolean; realSendPossible: boolean };
+  webhooks: { destinations: number; deadLetters: number };
+  diagnostics: { openDriftAlerts: number };
+}
+
+export async function getWorkspaceAdminOverview(): Promise<WorkspaceAdminOverview> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/admin-overview`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load admin overview"));
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Scheduler Fleet Status
+// ---------------------------------------------------------------------------
+
+export interface SchedulerFleetEntry {
+  name: string;
+  enabled: boolean;
+  lastStatus?: string;
+  lastStartedAt?: string;
+  lastFinishedAt?: string;
+  runCount: number;
+  failureCount: number;
+  skippedCount: number;
+  lastSummary?: Record<string, string | number | boolean | null>;
+}
+
+export async function getSchedulerFleetStatus(): Promise<{ schedulers: SchedulerFleetEntry[] }> {
+  const response = await fetch(`${API_BASE_URL}/settings/workspace/schedulers`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load scheduler status"));
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Workspace Admin Export
+// ---------------------------------------------------------------------------
+
+export async function getWorkspaceAdminExport(range?: string): Promise<Record<string, unknown>> {
+  const url = new URL(`${API_BASE_URL}/settings/workspace/admin-export`);
+  if (range) url.searchParams.set("range", range);
+
+  const response = await fetch(url.toString(), {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load admin export"));
+  return response.json();
+}
+
+export function getWorkspaceAdminExportDownloadUrl(range?: string): string {
+  const url = new URL(`${API_BASE_URL}/settings/workspace/admin-export/download`);
+  if (range) url.searchParams.set("range", range);
+  return url.toString();
 }

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma.js";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export class WorkspaceMembershipError extends Error {
   constructor(public code: string) {
@@ -87,6 +88,13 @@ export async function enableMembership({
   workspaceId: string;
   membershipId: string;
 }) {
+  await assertWorkspaceQuota({
+    workspaceId,
+    resource: 'members',
+    actorUserId,
+    source: 'workspace_member_enable'
+  });
+
   return await prisma.$transaction(async tx => {
     // 1. Check actor is an owner
     const actorMembership = await tx.workspaceMembership.findUnique({

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "./prisma.js";
 import { env } from "../config/env.js";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export interface SafeApiKey {
   id: string;
@@ -73,6 +74,13 @@ export async function createApiKey(input: CreateApiKeyInput): Promise<{ rawKey: 
   if (!env.ENABLE_DB_API_KEYS) {
     throw new Error("DB API Keys are not enabled.");
   }
+
+  await assertWorkspaceQuota({
+    workspaceId: input.workspaceId,
+    resource: 'apiKeys',
+    actorUserId: input.userId,
+    source: 'api_key_create'
+  });
   
   const rawKey = generateInternalApiKey();
   const keyPrefix = getKeyPrefix(rawKey);

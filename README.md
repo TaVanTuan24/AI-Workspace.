@@ -219,6 +219,9 @@ The user list returns only safe fields: user ID, email, display name, role, crea
 Role audit events store safe metadata only: actor user ID, target user ID, previous role, next role, action, and timestamp. They do not store emails, names, session payloads, secrets, prompts, or provider content.
 ### 28. Workspace Switching
 
+- [x] **54A:** Workspace Quota & Usage Limit Scaffold
+- [x] **53I:** SMTP Dry-run Verification & Secret Redaction Hardening
+- [x] **54B:** Quota Enforcement Coverage & Usage UX Hardening
 The Workspace Switcher provides a scaffold for users to switch between different workspaces they have membership in.
 It fetches the active memberships via the GET /settings/workspaces API and allows switching context via POST /settings/workspaces/switch.
 When a user switches their workspace, the frontend context reloads to prevent cross-workspace data leakage.
@@ -232,12 +235,13 @@ The application now supports **Workspace Creation**, allowing users to create th
 - After creating a new workspace, the Workspace Switcher securely swaps the user's current context to the new workspace, reloading the UI to guarantee no state is leaked.
 - The application still natively supports single-workspace/local deployments. The default 'Local Workspace' will continue to handle users without an explicit workspace assignment.
 
-### 30. Workspace Invites & Email Delivery Scaffold
+### 30. Workspace Invites & Email Delivery
 
 The workspace supports **Workspace Invites**, allowing owners to invite new members to their workspace.
 - **Secure by Default**: Invite tokens are hashed at rest using SHA-256. Raw tokens are only shown once during creation. The list API never exposes raw tokens or their hashes.
 - **Expiry Management**: Invites expire after 7 days by default. A background scheduler automatically cleans up expired invites. Owners can explicitly revoke or manage invites from the Settings area.
-- **Role Isolation**: Only `owner` role users can create or manage invites. New memberships default to `member` role, but owners can specify any valid role. Disabled memberships cannot interact with the workspace.
-- **Email Delivery Scaffold**: The system includes a safe, no-op email delivery scaffold. It securely renders invite email templates (HTML and Text) using `html-escaper` to prevent XSS. It logs delivery attempts for auditing but **does not send actual emails** or make SMTP connections. All delivery secrets remain unconfigured to prevent accidental data exfiltration.
+- **Role Isolation**: Only `owner` role users can manage invites. New memberships default to `member` role, but owners can specify any valid role.
+- **Email Delivery Support**: The system supports multiple email delivery modes via `WORKSPACE_INVITE_EMAIL_PROVIDER` (`noop`, `console_dry_run`, `smtp`). 
+- **Delivery Safety Guardrails**: Real SMTP delivery is disabled by default and requires explicit configuration (`WORKSPACE_INVITE_EMAIL_ALLOW_REAL_SEND=true` and `WORKSPACE_INVITE_EMAIL_DRY_RUN=false`). In test environments, real sending is hard-blocked regardless of configuration. Delivery attempts are logged securely for auditing but never include sensitive invite tokens or links. Error messages strictly redact any accidentally exposed provider secrets or API keys.
 #   A I - W o r k s p a c e .  
  

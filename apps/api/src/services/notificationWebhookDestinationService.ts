@@ -3,6 +3,7 @@ import { encryptSecretString, decryptSecretString } from "./secretBoxService.js"
 import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { validatePayloadConfig } from "./notificationWebhookPayloadTemplateService.js";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 // Basic URL validation
 function isValidUrl(url: string): boolean {
@@ -85,6 +86,15 @@ export async function listWebhookDestinations(userId: string, workspaceId?: stri
 export async function createWebhookDestination(userId: string, workspaceId: string, data: any) {
   if (!isValidUrl(data.url)) {
     throw new Error("Invalid URL. Only HTTP and HTTPS are allowed.");
+  }
+
+  if (workspaceId) {
+    await assertWorkspaceQuota({
+      workspaceId,
+      resource: 'webhookDestinations',
+      actorUserId: userId,
+      source: 'webhook_destination_create'
+    });
   }
 
   const rawSecret = crypto.randomBytes(32).toString("base64url");

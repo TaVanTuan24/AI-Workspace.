@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-22T16:27:02.018Z",
+  "generatedAt": "2026-06-23T04:10:20.852Z",
   "policyPath": "tools/security/policy.json",
   "summary": {
-    "totalPackages": 439,
-    "allowed": 436,
+    "totalPackages": 441,
+    "allowed": 437,
     "review": 2,
     "denied": 0,
-    "unknown": 1
+    "unknown": 2
   },
   "packages": [
     {
@@ -450,6 +450,15 @@
       "originalLicenseExpression": "MIT",
       "status": "allowed",
       "path": "D:\\NodeJs\\synthetic AI\\node_modules\\.pnpm\\@types+node@20.19.43\\node_modules\\@types\\node"
+    },
+    {
+      "name": "@types/nodemailer",
+      "version": "8.0.1",
+      "license": "MIT",
+      "normalizedLicense": "MIT",
+      "originalLicenseExpression": "MIT",
+      "status": "allowed",
+      "path": "D:\\NodeJs\\synthetic AI\\node_modules\\.pnpm\\@types+nodemailer@8.0.1\\node_modules\\@types\\nodemailer"
     },
     {
       "name": "@types/prop-types",
@@ -3050,6 +3059,14 @@
       "originalLicenseExpression": "MIT-0",
       "status": "unknown",
       "path": "D:\\NodeJs\\synthetic AI\\node_modules\\.pnpm\\@csstools+color-helpers@5.1.0\\node_modules\\@csstools\\color-helpers"
+    },
+    {
+      "name": "nodemailer",
+      "version": "9.0.1",
+      "license": "MIT-0",
+      "originalLicenseExpression": "MIT-0",
+      "status": "unknown",
+      "path": "D:\\NodeJs\\synthetic AI\\node_modules\\.pnpm\\nodemailer@9.0.1\\node_modules\\nodemailer"
     },
     {
       "name": "@cyclonedx/cyclonedx-library",

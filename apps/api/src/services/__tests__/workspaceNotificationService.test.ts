@@ -53,7 +53,10 @@ const defaultNotificationPreferences = {
   notifyProviderSessionIssues: true,
   notifyNoUsableModels: true,
   notifyProviderLimitSpikes: true,
-  providerLimitSpikeThreshold24h: 10
+  providerLimitSpikeThreshold24h: 10,
+  notifyWorkspaceQuotaWarnings: true,
+  notifyWorkspaceQuotaExceeded: true,
+  workspaceQuotaWarningThresholdPercent: 90
 };
 
 describe("workspaceNotificationService", () => {

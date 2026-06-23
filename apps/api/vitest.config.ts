@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    fileParallelism: false,
     env: {
       UAIW_TEST_FAIL_ON_DEFAULT_WORKSPACE_FALLBACK: "true"
     }

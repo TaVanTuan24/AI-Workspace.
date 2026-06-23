@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ShieldCheck, UsersRound } from "lucide-react";
 import {
   getManagedUsers,
@@ -13,13 +13,20 @@ import {
   createWorkspaceInvite,
   revokeWorkspaceInvite,
   getWorkspaceInviteExpirySchedulerStatus,
+  WorkspaceInviteEmailDeliveryStatus,
+  getWorkspaceInviteEmailDeliveryStatus,
+  sendWorkspaceInviteDeliveryTest,
+  getWorkspaceInviteDeliveryAttempts,
+  type WorkspaceInviteDeliveryAttempt,
   type ManagedUser,
   type UserRoleAuditEvent,
   type WorkspacePermission,
   type WorkspaceRole,
   type WorkspaceInvite,
   type CreateWorkspaceInviteResult,
-  type SchedulerStatusView
+  type SchedulerStatusView,
+  getWorkspaceQuotaSummary,
+  type WorkspaceUsageSummary
 } from "../../../lib/api";
 
 const roles: WorkspaceRole[] = ["owner", "admin", "member", "viewer"];
@@ -49,6 +56,16 @@ export default function UsersAndRolesPage() {
   const [newInviteData, setNewInviteData] = useState<CreateWorkspaceInviteResult | null>(null);
 
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatusView | null>(null);
+  const [deliveryConfig, setDeliveryConfig] = useState<WorkspaceInviteEmailDeliveryStatus | null>(null);
+
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: string; provider: string; testSubject?: string; error?: string } | null>(null);
+
+  const [viewingAttemptsFor, setViewingAttemptsFor] = useState<string | null>(null);
+  const [deliveryAttempts, setDeliveryAttempts] = useState<WorkspaceInviteDeliveryAttempt[] | null>(null);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
+
+  const [quotaSummary, setQuotaSummary] = useState<WorkspaceUsageSummary | null>(null);
 
   useEffect(() => {
     void loadData();
@@ -58,12 +75,14 @@ export default function UsersAndRolesPage() {
     try {
       setLoading(true);
       setError("");
-      const [overview, userData, auditData, inviteData, schedulerData] = await Promise.all([
+      const [overview, userData, auditData, inviteData, schedulerData, emailStatusData, quotaData] = await Promise.all([
         getSettingsOverview(),
         getManagedUsers(),
         getWorkspaceAuditEvents(50).catch(() => ({ events: [] })),
         listWorkspaceInvites().catch(() => ({ invites: [] })),
-        getWorkspaceInviteExpirySchedulerStatus().catch(() => null)
+        getWorkspaceInviteExpirySchedulerStatus().catch(() => null),
+        getWorkspaceInviteEmailDeliveryStatus().catch(() => null),
+        getWorkspaceQuotaSummary().catch(() => null)
       ]);
       setCurrentUserId(overview.currentUser.id);
       setPermissions(overview.currentUser.permissions);
@@ -71,6 +90,8 @@ export default function UsersAndRolesPage() {
       setAuditEvents(auditData.events);
       setInvites(inviteData.invites);
       setSchedulerStatus(schedulerData);
+      setDeliveryConfig(emailStatusData);
+      setQuotaSummary(quotaData);
     } catch (err: any) {
       setError(friendlyError(err.message || "Failed to load users"));
     } finally {
@@ -148,6 +169,45 @@ export default function UsersAndRolesPage() {
     }
   }
 
+  async function handleTestEmailDelivery() {
+    if (!deliveryConfig) return;
+    
+    let allowRealSendTest = false;
+    if (deliveryConfig.realSendPossible && deliveryConfig.provider === "smtp") {
+      allowRealSendTest = window.confirm("Real SMTP send is enabled. Do you want to send a real test email to your address?");
+    }
+
+    try {
+      setTestingEmail(true);
+      setError("");
+      setTestResult(null);
+      const res = await sendWorkspaceInviteDeliveryTest({ allowRealSendTest });
+      setTestResult(res);
+      setNotice(`Test complete: ${res.status} via ${res.provider}`);
+    } catch (err: any) {
+      setError(friendlyError(err.message || "Failed to run delivery test"));
+    } finally {
+      setTestingEmail(false);
+    }
+  }
+
+  async function handleViewDeliveryAttempts(inviteId: string) {
+    if (viewingAttemptsFor === inviteId) {
+      setViewingAttemptsFor(null);
+      return;
+    }
+    setViewingAttemptsFor(inviteId);
+    try {
+      setLoadingAttempts(true);
+      const res = await getWorkspaceInviteDeliveryAttempts(inviteId);
+      setDeliveryAttempts(res.attempts);
+    } catch (err: any) {
+      setError(friendlyError(err.message || "Failed to load delivery attempts"));
+    } finally {
+      setLoadingAttempts(false);
+    }
+  }
+
   async function handleToggleStatus(user: ManagedUser) {
     if (!canManageRoles) return;
     try {
@@ -209,6 +269,20 @@ export default function UsersAndRolesPage() {
           {notice}
         </div>
       ) : null}
+
+      {quotaSummary && quotaSummary.quotas.find(q => q.resource === "members" && q.exceeded) && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>Workspace member limit reached. <a href="/settings/quota" className="underline hover:text-red-200 ml-1">View quotas</a></span>
+        </div>
+      )}
+
+      {quotaSummary && quotaSummary.quotas.find(q => q.resource === "pendingInvites" && q.exceeded) && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>Workspace pending invites limit reached. <a href="/settings/quota" className="underline hover:text-red-200 ml-1">View quotas</a></span>
+        </div>
+      )}
 
       {!canManageRoles && !loading ? (
         <div className="rounded-lg border border-slate-700 bg-slate-800/70 p-4 text-sm text-slate-300">
@@ -296,15 +370,51 @@ export default function UsersAndRolesPage() {
       {canManageRoles ? (
         <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-5 py-4">
-            <h2 className="text-lg font-semibold text-slate-100">Pending Invites</h2>
-            <p className="mt-1 text-sm text-slate-500">Invite new users to the workspace.</p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-100">Workspace Invites</h2>
+                <p className="mt-1 text-sm text-slate-500">Invite new members to join the workspace.</p>
+              </div>
+              {deliveryConfig && (
+                <div className="flex flex-col gap-2 text-right">
+                  <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/50 px-3 py-1 text-xs text-slate-300 ml-auto">
+                    <span className={`h-2 w-2 rounded-full ${!deliveryConfig.enabled ? "bg-slate-500" : !deliveryConfig.realSendPossible && deliveryConfig.provider === "smtp" ? "bg-red-400" : deliveryConfig.dryRun ? "bg-amber-400" : "bg-emerald-400"}`} />
+                    {!deliveryConfig.enabled ? "Email delivery not configured" : deliveryConfig.provider === "console_dry_run" || deliveryConfig.dryRun ? "Dry-run mode" : !deliveryConfig.realSendPossible ? (deliveryConfig.missingRequiredConfig.length > 0 ? "SMTP incomplete" : "SMTP configured, real send disabled") : "SMTP ready"}
+                  </div>
+                  {deliveryConfig.warnings.length > 0 && (
+                    <div className="text-[10px] text-amber-400/80 max-w-xs">{deliveryConfig.warnings[0]}</div>
+                  )}
+                  <button
+                    onClick={handleTestEmailDelivery}
+                    disabled={testingEmail}
+                    className="self-end text-[10px] font-medium uppercase text-indigo-400 hover:text-indigo-300 disabled:opacity-50 mt-1"
+                  >
+                    {testingEmail ? "Testing..." : deliveryConfig.realSendPossible ? "Send test email" : "Preview test"}
+                  </button>
+                  {testResult && (
+                    <div className="mt-2 text-xs text-left max-w-xs rounded border border-slate-700 bg-slate-800 p-2 text-slate-300">
+                      <div><span className="font-semibold">Status:</span> {testResult.status}</div>
+                      <div><span className="font-semibold">Provider:</span> {testResult.provider}</div>
+                      {testResult.testSubject && <div><span className="font-semibold">Preview:</span> {testResult.testSubject}</div>}
+                      {testResult.error && <div className="text-red-400"><span className="font-semibold">Error:</span> {testResult.error}</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="p-5">
             {newInviteData && (
               <div className="mb-6 rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-4">
                 <h3 className="font-medium text-indigo-300">Invite created successfully</h3>
                 <p className="mt-2 text-sm text-indigo-200">
-                  Email delivery is currently not configured ({newInviteData.delivery.channel} &middot; {newInviteData.delivery.status}). Please copy the invite link manually.
+                  {!deliveryConfig?.enabled ? (
+                    `Email delivery is disabled by default (${newInviteData.delivery.channel} \u00B7 ${newInviteData.delivery.status.replace(/_/g, " ")}). Please copy the invite link manually.`
+                  ) : deliveryConfig?.dryRun ? (
+                    `Email delivery is in dry-run mode (${newInviteData.delivery.channel} \u00B7 ${newInviteData.delivery.status.replace(/_/g, " ")}). Please copy the invite link manually.`
+                  ) : (
+                    `Invite email queued for delivery (${newInviteData.delivery.channel} \u00B7 ${newInviteData.delivery.status.replace(/_/g, " ")}). You can also copy the link manually if needed.`
+                  )}
                 </p>
                 <div className="mt-3 flex items-center justify-between rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm text-slate-300">
                   <span className="truncate mr-4">{newInviteData.inviteUrl || newInviteData.token}</span>
@@ -384,8 +494,9 @@ export default function UsersAndRolesPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-800/70">
                     {invites.map((invite) => (
-                      <tr key={invite.id}>
-                        <td className="px-4 py-3 font-medium text-slate-200">{invite.email}</td>
+                      <React.Fragment key={invite.id}>
+                        <tr>
+                          <td className="px-4 py-3 font-medium text-slate-200">{invite.email}</td>
                         <td className="px-4 py-3">
                           <span className={roleBadge(invite.role)}>{roleLabels[invite.role]}</span>
                         </td>
@@ -403,16 +514,50 @@ export default function UsersAndRolesPage() {
                         </td>
                         <td className="px-4 py-3 text-slate-400">{formatDate(invite.expiresAt)}</td>
                         <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleViewDeliveryAttempts(invite.id)}
+                            className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                          >
+                            Details
+                          </button>
                           {invite.status === "pending" && (
                             <button
                               onClick={() => handleRevokeInvite(invite.id)}
-                              className="text-xs font-medium text-red-400 hover:text-red-300"
+                              className="ml-3 text-xs font-medium text-red-400 hover:text-red-300"
                             >
                               Revoke
                             </button>
                           )}
                         </td>
-                      </tr>
+                        </tr>
+                        {viewingAttemptsFor === invite.id && (
+                          <tr className="bg-slate-900/50">
+                            <td colSpan={6} className="px-4 py-3 border-t border-slate-800">
+                              <h4 className="text-xs font-semibold text-slate-400 mb-2 uppercase">Delivery Details</h4>
+                              {loadingAttempts ? (
+                                <div className="text-xs text-slate-500">Loading attempts...</div>
+                              ) : deliveryAttempts && deliveryAttempts.length > 0 ? (
+                                <ul className="space-y-2">
+                                  {deliveryAttempts.map(attempt => (
+                                    <li key={attempt.id} className="text-xs p-2 rounded border border-slate-800 bg-slate-950">
+                                      <div className="flex items-center gap-2 text-slate-300 mb-1">
+                                        <span className={`h-1.5 w-1.5 rounded-full ${attempt.status === "sent" ? "bg-emerald-400" : attempt.status.startsWith("skipped") ? "bg-amber-400" : "bg-red-400"}`} />
+                                        <span className="font-semibold">{attempt.channel} &middot; {attempt.provider}</span>
+                                        <span className="text-slate-500 ml-auto">{new Date(attempt.createdAt).toLocaleString()}</span>
+                                      </div>
+                                      <div className="text-slate-400">Status: <span className="capitalize">{attempt.status.replace(/_/g, " ")}</span></div>
+                                      {attempt.reason && <div className="text-slate-500 mt-1">Reason: {attempt.reason}</div>}
+                                      {attempt.recipientEmailRedacted && <div className="text-slate-500">To: {attempt.recipientEmailRedacted}</div>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-xs text-slate-500">No delivery attempts recorded.</div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -555,7 +700,8 @@ function friendlyError(message: string) {
     last_owner_required: "At least one owner must remain.",
     self_demote_confirmation_required: "Self-demotion requires explicit confirmation.",
     invalid_role: "Invalid role.",
-    user_not_found: "User not found."
+    user_not_found: "User not found.",
+    workspace_quota_exceeded: "Workspace limit reached. Check your Quota & Limits settings."
   };
   return map[message] ?? message;
 }

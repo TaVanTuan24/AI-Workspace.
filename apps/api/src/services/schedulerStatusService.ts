@@ -7,7 +7,10 @@ export type SchedulerLastStatus = "running" | "success" | "failed" | "skipped" |
 
 export interface SchedulerSafeSummary {
   scanned?: number;
+  scannedWorkspaces?: number;
   expired?: number;
+  warningsCreated?: number;
+  exceededCreated?: number;
   skipped?: number;
   dryRun?: boolean;
   durationMs?: number;
@@ -230,7 +233,10 @@ function sanitizeSummary(input?: SchedulerSafeSummary): SchedulerSafeSummary {
   const lock = input?.lock === "acquired" || input?.lock === "skipped" || input?.lock === "unavailable" ? input.lock : undefined;
   return {
     ...(safeNumber(input?.scanned) !== undefined ? { scanned: safeNumber(input?.scanned) } : {}),
+    ...(safeNumber(input?.scannedWorkspaces) !== undefined ? { scannedWorkspaces: safeNumber(input?.scannedWorkspaces) } : {}),
     ...(safeNumber(input?.expired) !== undefined ? { expired: safeNumber(input?.expired) } : {}),
+    ...(safeNumber(input?.warningsCreated) !== undefined ? { warningsCreated: safeNumber(input?.warningsCreated) } : {}),
+    ...(safeNumber(input?.exceededCreated) !== undefined ? { exceededCreated: safeNumber(input?.exceededCreated) } : {}),
     ...(safeNumber(input?.skipped) !== undefined ? { skipped: safeNumber(input?.skipped) } : {}),
     ...(typeof input?.dryRun === "boolean" ? { dryRun: input.dryRun } : {}),
     ...(safeNumber(input?.durationMs) !== undefined ? { durationMs: safeNumber(input?.durationMs) } : {}),

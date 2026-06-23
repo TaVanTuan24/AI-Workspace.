@@ -74,10 +74,10 @@ export function parseArgs(argv) {
 export function usage() {
   return [
     "Usage:",
-    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0",
-    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0 --skip-up",
-    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0 --down",
-    "  corepack pnpm release:staging:local --generate-env --env-file .env.staging --expected-version 0.2.0 --down",
+    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0",
+    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0 --skip-up",
+    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0 --down",
+    "  corepack pnpm release:staging:local --generate-env --env-file .env.staging --expected-version 0.3.0 --down",
     "  corepack pnpm release:staging:local --preflight-only --env-file .env.staging",
     "",
     "Safe defaults:",
@@ -112,7 +112,7 @@ export async function runLocalStagingSmoke(options, deps = {}) {
   await validateEnvFile(envFile, options);
 
   const envValues = await readEnvFile(envFile);
-  const expectedVersion = options.expectedVersion || envValues.APP_VERSION || "0.2.0";
+  const expectedVersion = options.expectedVersion || envValues.APP_VERSION || "0.3.0";
   const baseUrl = options.baseUrl || envValues.API_BASE_URL || "http://localhost:4000";
   const targetReleaseDir = path.resolve(
     root,
@@ -398,8 +398,8 @@ function formatStagingResumeGuidance({ envFile, targetReleaseDir, markerExists, 
     "",
     "Resume commands:",
     "  docker info",
-    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0 --base-url http://localhost:4000 --down",
-    "  corepack pnpm release:tag:dry-run --version 0.2.0 --release-dir dist-release/unified-ai-workspace-0.2.0"
+    "  corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0 --base-url http://localhost:4000 --down",
+    "  corepack pnpm release:tag:dry-run --version 0.3.0 --release-dir dist-release/unified-ai-workspace-0.3.0"
   ].join("\n");
 }
 

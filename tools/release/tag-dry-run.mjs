@@ -32,7 +32,7 @@ export function parseArgs(argv) {
 export function usage() {
   return [
     "Usage:",
-    "  corepack pnpm release:tag:dry-run --version 0.2.0 --release-dir dist-release/unified-ai-workspace-0.2.0",
+    "  corepack pnpm release:tag:dry-run --version 0.3.0 --release-dir dist-release/unified-ai-workspace-0.3.0",
     "",
     "This command does not create tags, push tags, sign artifacts, or publish images."
   ].join("\n");
@@ -61,12 +61,11 @@ export async function runTagDryRun(options, deps = {}) {
   checks.push(await check("release manifest exists", async () => pathExists(path.join(releaseDirPath, "release-manifest.json"))));
   checks.push(await check("SBOM exists", async () => pathExists(path.join(releaseDirPath, "sbom.cyclonedx.json"))));
   checks.push(await check("checksums verify", async () => verifyChecksums(releaseDirPath)));
-  checks.push(await check("RELEASE_NOTES.md references version", async () => fileContains(path.join(root, "RELEASE_NOTES.md"), version)));
+  checks.push(await check(`docs/RELEASE_NOTES_${version}.md exists`, async () => pathExists(path.join(root, "docs", `RELEASE_NOTES_${version}.md`))));
   checks.push(await check("CHANGELOG.md references version", async () => fileContains(path.join(root, "CHANGELOG.md"), version)));
   checks.push(await check(`docs/UPGRADE-${version}.md exists`, async () => pathExists(path.join(root, "docs", `UPGRADE-${version}.md`))));
-  checks.push(await check(`docs/RELEASE_TAG_CHECKLIST_${version}.md exists`, async () => {
-    const underscored = version.replace(/\./g, ".");
-    return pathExists(path.join(root, "docs", `RELEASE_TAG_CHECKLIST_${underscored}.md`));
+  checks.push(await check(`docs/RELEASE_OPERATOR_HANDOFF_${version}.md exists`, async () => {
+    return pathExists(path.join(root, "docs", `RELEASE_OPERATOR_HANDOFF_${version}.md`));
   }));
   checks.push(await check("license notices doc exists", async () => pathExists(path.join(root, "docs", "THIRD_PARTY_LICENSE_NOTICES.md"))));
 
@@ -86,7 +85,7 @@ export async function runTagDryRun(options, deps = {}) {
     nextSteps.push(`corepack pnpm release:operator:status --version ${version} --release-dir ${normalizePath(path.relative(root, releaseDirPath))}`);
     nextSteps.push(`corepack pnpm release:staging:local --env-file .env.staging --expected-version ${version} --base-url http://localhost:4000 --down`);
     nextSteps.push(`corepack pnpm release:tag:dry-run --version ${version} --release-dir ${normalizePath(path.relative(root, releaseDirPath))}`);
-    nextSteps.push("Review docs/RELEASE_OPERATOR_HANDOFF_0.2.0.md");
+    nextSteps.push(`Review docs/RELEASE_OPERATOR_HANDOFF_${version}.md`);
     checks.push({ name: "staging verification marker exists", status: "warn", detail: marker.detail });
   }
 

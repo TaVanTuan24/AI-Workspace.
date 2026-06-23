@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "./prisma.js";
 import { normalizeWorkspaceRole, type WorkspaceRole } from "../auth/permissions.js";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export class WorkspaceInviteError extends Error {
   constructor(
@@ -57,6 +58,13 @@ export async function createWorkspaceInvite({
   actorUserId: string;
 }): Promise<WorkspaceInviteCreateResult> {
   const normalizedEmail = email.toLowerCase().trim();
+
+  await assertWorkspaceQuota({
+    workspaceId,
+    resource: 'pendingInvites',
+    actorUserId,
+    source: 'workspace_invite_create'
+  });
 
   // Check if already a member
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -167,6 +175,19 @@ export async function acceptWorkspaceInvite({ token, userId }: { token: string; 
   return prisma.$transaction(async (tx) => {
     const invite = await tx.workspaceInvite.findFirst({
       where: { tokenHash }
+    });
+
+    if (!invite) throw new WorkspaceInviteError("invite_not_found");
+    
+    // Check members quota inside or outside tx? It's fine outside, but we only have workspaceId from the invite.
+    // So we fetch invite first. Let's do a non-tx check first or just check inside tx (quota check doesn't use tx yet but safe enough).
+    // Actually quota relies on non-tx reads so we can do it outside if we know workspaceId. Let's just check it.
+    // However, assertWorkspaceQuota is async and uses prisma directly, so checking it inside tx is fine, it just won't see uncommitted writes.
+    await assertWorkspaceQuota({
+      workspaceId: invite.workspaceId,
+      resource: 'members',
+      actorUserId: userId,
+      source: 'workspace_invite_accept'
     });
 
     if (!invite) throw new WorkspaceInviteError("invite_not_found");

@@ -12,7 +12,7 @@ export const DOCKER_DAEMON_NEXT_STEPS = [
   "Start Docker Desktop.",
   "On Windows, switch Docker Desktop to Linux containers/engine.",
   "Wait until `docker info` succeeds.",
-  "Rerun `corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.2.0 --base-url http://localhost:4000 --down`."
+  "Rerun `corepack pnpm release:staging:local --env-file .env.staging --expected-version 0.3.0 --base-url http://localhost:4000 --down`."
 ];
 
 export async function checkDockerCli(deps = {}) {

@@ -13,7 +13,7 @@ describe("local-staging-smoke", () => {
   it("refuses to run with .env", async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "uaiw-env-"));
     const envPath = path.join(temp, ".env");
-    await fs.writeFile(envPath, "APP_VERSION=0.2.0\n", "utf8");
+    await fs.writeFile(envPath, "APP_VERSION=0.3.0\n", "utf8");
 
     await assert.rejects(
       () => validateEnvFile(envPath, {}),
@@ -31,11 +31,11 @@ describe("local-staging-smoke", () => {
   it("builds compose commands in dry-run mode without running Docker", async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "uaiw-staging-"));
     const envPath = path.join(temp, ".env.staging");
-    await fs.writeFile(envPath, "APP_VERSION=0.2.0\nAPI_BASE_URL=http://user:pass@localhost:4000?token=abc\n", "utf8");
+    await fs.writeFile(envPath, "APP_VERSION=0.3.0\nAPI_BASE_URL=http://user:pass@localhost:4000?token=abc\n", "utf8");
 
     const report = await runLocalStagingSmoke({
       envFile: envPath,
-      expectedVersion: "0.2.0",
+      expectedVersion: "0.3.0",
       dryRun: true
     });
 
@@ -52,12 +52,12 @@ describe("local-staging-smoke", () => {
     const envPath = path.join(temp, ".env.staging");
     const releaseDir = path.join(temp, "release");
     const commands = [];
-    await fs.writeFile(envPath, "APP_VERSION=0.2.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
+    await fs.writeFile(envPath, "APP_VERSION=0.3.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
 
     const report = await runLocalStagingSmoke(
       {
         envFile: envPath,
-        expectedVersion: "0.2.0",
+        expectedVersion: "0.3.0",
         releaseDir
       },
       {
@@ -82,7 +82,7 @@ describe("local-staging-smoke", () => {
     const marker = JSON.parse(await fs.readFile(path.join(releaseDir, "staging-verification.json"), "utf8"));
     assert.equal(report.result, "pass");
     assert.equal(commands.length, 2);
-    assert.equal(marker.version, "0.2.0");
+    assert.equal(marker.version, "0.3.0");
     assert.deepEqual(marker.checksPassed, ["health", "ready", "version", "health-details"]);
     assert.equal(marker.chatSmoke, false);
     assert.equal(marker.liveProviderLoginTests, false);
@@ -98,7 +98,7 @@ describe("local-staging-smoke", () => {
     await assert.rejects(
       () => runLocalStagingSmoke({
         envFile: envPath,
-        expectedVersion: "0.2.0",
+        expectedVersion: "0.3.0",
         releaseDir
       }),
       /Env file not found/
@@ -107,14 +107,14 @@ describe("local-staging-smoke", () => {
     const report = await runLocalStagingSmoke(
       {
         envFile: envPath,
-        expectedVersion: "0.2.0",
+        expectedVersion: "0.3.0",
         releaseDir,
         generateEnv: true
       },
       {
         generateStagingEnv: async ({ out }) => {
           generatorCalled = true;
-          await fs.writeFile(out, "APP_VERSION=0.2.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
+          await fs.writeFile(out, "APP_VERSION=0.3.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
         },
         runDockerPreflight: async () => passingPreflightReport(),
         writeDockerPreflightStatus: async () => ({ path: path.join(temp, "preflight-status.json"), content: {} }),
@@ -138,7 +138,7 @@ describe("local-staging-smoke", () => {
     const envPath = path.join(temp, ".env.staging");
     const statusPath = path.join(temp, "preflight-status.json");
     const commands = [];
-    await fs.writeFile(envPath, "APP_VERSION=0.2.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
+    await fs.writeFile(envPath, "APP_VERSION=0.3.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
 
     const report = await runLocalStagingSmoke(
       {
@@ -165,13 +165,13 @@ describe("local-staging-smoke", () => {
     const releaseDir = path.join(temp, "release");
     const statusPath = path.join(temp, "preflight-status.json");
     const commands = [];
-    await fs.writeFile(envPath, "APP_VERSION=0.2.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
+    await fs.writeFile(envPath, "APP_VERSION=0.3.0\nAPI_BASE_URL=http://localhost:4000\n", "utf8");
 
     await assert.rejects(
       () => runLocalStagingSmoke(
         {
           envFile: envPath,
-          expectedVersion: "0.2.0",
+          expectedVersion: "0.3.0",
           releaseDir
         },
         {

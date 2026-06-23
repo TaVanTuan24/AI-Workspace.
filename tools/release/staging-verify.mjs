@@ -19,7 +19,13 @@ const SAFE_SETTINGS_ENDPOINTS = [
   "/settings/provider-recovery/scheduler-status",
   "/settings/provider-health/incidents?limit=10",
   "/settings/provider-health/diagnostics-runs?limit=10",
-  "/settings/notification-delivery/dead-letters?limit=10"
+  "/settings/notification-delivery/dead-letters?limit=10",
+  "/settings/workspace/admin-overview",
+  "/settings/workspace/activity",
+  "/settings/workspace/schedulers",
+  "/settings/workspace/quota",
+  "/settings/workspace/quota/report",
+  "/settings/workspace/invites/email-delivery-status"
 ];
 
 export function parseArgs(argv) {
@@ -58,8 +64,8 @@ export function parseArgs(argv) {
 export function usage() {
   return [
     "Usage:",
-    "  corepack pnpm release:staging:verify --base-url http://localhost:3000 --expected-version 0.2.0",
-    "  corepack pnpm release:staging:verify --base-url http://localhost:3000 --expected-version 0.2.0 --api-key-env UAIW_STAGING_API_KEY",
+    "  corepack pnpm release:staging:verify --base-url http://localhost:3000 --expected-version 0.3.0",
+    "  corepack pnpm release:staging:verify --base-url http://localhost:3000 --expected-version 0.3.0 --api-key-env UAIW_STAGING_API_KEY",
     "",
     "Safe defaults:",
     "  - Performs safe GET checks only by default.",

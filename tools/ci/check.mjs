@@ -13,7 +13,13 @@ const commands = [
   ["corepack", ["pnpm", "test"]],
   ["corepack", ["pnpm", "--filter", "@uaiw/api...", "build"]],
   ["corepack", ["pnpm", "--filter", "@uaiw/worker...", "build"]],
-  ["corepack", ["pnpm", "--filter", "@uaiw/web...", "build"]]
+  ["corepack", ["pnpm", "--filter", "@uaiw/web...", "build"]],
+  ["corepack", ["pnpm", "security:scan"]],
+  ["corepack", ["pnpm", "release:check"]],
+  ["corepack", ["pnpm", "workspace:invites:expire", "--dry-run"]],
+  ["corepack", ["pnpm", "workspace:quota-alerts:run", "--dry-run"]],
+  ["corepack", ["pnpm", "workspace:quota-events:cleanup", "--dry-run"]],
+  ["corepack", ["pnpm", "workspace:governance:backfill", "--dry-run"]]
 ];
 
 if (!skipDocker) {

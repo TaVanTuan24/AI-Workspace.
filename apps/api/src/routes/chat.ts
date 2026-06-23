@@ -16,6 +16,7 @@ import {
   ProviderRateLimitExceededError
 } from "../services/providerRateLimitService.js";
 import { logProviderRateLimitHit, modelIdForProvider } from "../services/apiUsageService.js";
+import { assertWorkspaceQuota } from "../services/workspaceQuotaService.js";
 
 const MAX_PROMPT_LENGTH = 20_000;
 
@@ -44,6 +45,16 @@ export async function chatRoutes(app: FastifyInstance) {
 
   app.post("/chat", async (request, reply) => {
     const body = chatBody.parse(request.body);
+
+    if (request.user.workspaceId) {
+      await assertWorkspaceQuota({
+        workspaceId: request.user.workspaceId,
+        resource: 'monthlyApiRequests',
+        actorUserId: request.user.id,
+        source: 'internal_chat'
+      });
+    }
+
     const providerCheck = await validateRunnableProvider(request.user.id, body.provider);
     if (!providerCheck.ok) {
       const status = providerCheck.error.errorCode === "PROVIDER_NOT_READY" ? 501 : 409;
@@ -134,6 +145,17 @@ provider: providerCheck.provider,
   app.post("/chat/multi", async (request, reply) => {
     const body = multiChatBody.parse(request.body);
     const providers = [...new Set(body.providers)];
+
+    if (request.user.workspaceId) {
+      await assertWorkspaceQuota({
+        workspaceId: request.user.workspaceId,
+        resource: 'monthlyApiRequests',
+        incrementBy: providers.length,
+        actorUserId: request.user.id,
+        source: 'internal_multi_chat'
+      });
+    }
+
     const checks = await Promise.all(
       providers.map(async (provider) => validateRunnableProvider(request.user.id, provider))
     );

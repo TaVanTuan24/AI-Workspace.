@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { providerDiagnosticsHistoryService, ProviderDiagnosticsDiffView } from "./providerDiagnosticsHistoryService.js";
 import { createHash } from "crypto";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export type DiagnosticsDriftEvaluation = {
   baselineId?: string;
@@ -26,6 +27,16 @@ export class ProviderDiagnosticsBaselineService {
   }) {
     const run = await providerDiagnosticsHistoryService.getDiagnosticsRunDetail({ userId: params.userId, runId: params.runId });
     if (!run) throw new Error("Diagnostics run not found");
+
+    const workspaceId = (await prisma.user.findUnique({ where: { id: params.userId } }))?.workspaceId || null;
+    if (workspaceId) {
+      await assertWorkspaceQuota({
+        workspaceId,
+        resource: 'diagnosticsBaselines',
+        actorUserId: params.userId,
+        source: 'diagnostics_baseline_create'
+      });
+    }
 
     const safeName = params.name.substring(0, 100);
     

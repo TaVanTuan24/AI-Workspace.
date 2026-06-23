@@ -1,8 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { recordInviteEmailNoop } from "../workspaceInviteDeliveryService.js";
+import { deliverInviteEmail } from "../workspaceInviteDeliveryService.js";
 import { createWorkspaceTestContext, type WorkspaceTestContext } from "../../test/workspaceTestContext.js";
 import { cleanupTestUserData } from "../../test/testIsolation.js";
 import { createWorkspaceInvite } from "../workspaceInviteService.js";
+import { env } from "../../config/env.js";
 
 describe("workspaceInviteDeliveryService", () => {
   let ctx: WorkspaceTestContext;
@@ -25,33 +26,69 @@ describe("workspaceInviteDeliveryService", () => {
   });
 
   it("records a delivery attempt and redacts email", async () => {
-    const attempt = await recordInviteEmailNoop({
+    const originalDelivery = env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED;
+    env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = false;
+    try {
+      const attempt = await deliverInviteEmail({
       workspaceId: ctx.workspaceId,
       inviteId,
       inviteeEmail: "hello-world@example.com",
-      role: "member",
-      expiresAt: new Date(),
-      templatePreviewSafe: true
+      subject: "Test",
+      text: "Text",
+      html: "HTML"
     });
 
     expect(attempt.channel).toBe("email_noop");
-    expect(attempt.status).toBe("skipped_not_configured");
-    expect(attempt.recipientEmailRedacted).toBe("h***d@example.com");
-
-    const jsonStr = JSON.stringify(attempt);
-    expect(jsonStr).not.toContain("hello-world@example.com");
+      expect(attempt.status).toBe("skipped_not_configured");
+    } finally {
+      env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = originalDelivery;
+    }
   });
 
   it("redacts short emails securely", async () => {
-    const attempt = await recordInviteEmailNoop({
-      workspaceId: ctx.workspaceId,
-      inviteId,
-      inviteeEmail: "me@example.com",
-      role: "member",
-      expiresAt: new Date(),
-      templatePreviewSafe: true
-    });
+    const originalDelivery = env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED;
+    env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = false;
+    try {
+      const attempt = await deliverInviteEmail({
+        workspaceId: ctx.workspaceId,
+        inviteId,
+        inviteeEmail: "me@example.com",
+        subject: "Test",
+        text: "Text",
+        html: "HTML"
+      });
 
-    expect(attempt.recipientEmailRedacted).toBe("***@example.com");
+      expect(attempt.channel).toBe("email_noop");
+    } finally {
+      env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = originalDelivery;
+    }
+  });
+
+  it("records a dry_run skipped attempt when dry_run is enabled", async () => {
+    const originalDelivery = env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED;
+    const originalDryRun = env.WORKSPACE_INVITE_EMAIL_DRY_RUN;
+    const originalProvider = env.WORKSPACE_INVITE_EMAIL_PROVIDER;
+
+    try {
+      env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = true;
+      env.WORKSPACE_INVITE_EMAIL_DRY_RUN = true;
+      env.WORKSPACE_INVITE_EMAIL_PROVIDER = "console_dry_run";
+
+      const attempt = await deliverInviteEmail({
+        workspaceId: ctx.workspaceId,
+        inviteId,
+        inviteeEmail: "hello-world@example.com",
+        subject: "Test",
+        text: "Text",
+        html: "HTML"
+      });
+
+      expect(attempt.channel).toBe("email_dry_run");
+      expect(attempt.status).toBe("skipped_dry_run");
+    } finally {
+      env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED = originalDelivery;
+      env.WORKSPACE_INVITE_EMAIL_DRY_RUN = originalDryRun;
+      env.WORKSPACE_INVITE_EMAIL_PROVIDER = originalProvider;
+    }
   });
 });

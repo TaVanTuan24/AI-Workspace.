@@ -11,7 +11,7 @@ describe("operator-status", () => {
     await fs.writeFile(envFile, "INTERNAL_API_KEY=do-not-print-this-secret\n", "utf8");
 
     const report = await runOperatorStatus(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => false,
         gitStatus: async () => ({ status: "unknown", reason: "not a git repository" }),
@@ -34,7 +34,7 @@ describe("operator-status", () => {
     const { releaseDir, envFile } = await createFixture({ marker: false });
 
     const report = await runOperatorStatus(
-      { version: "0.2.0", releaseDir, strict: true },
+      { version: "0.3.0", releaseDir, strict: true },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "clean" }),
@@ -50,7 +50,7 @@ describe("operator-status", () => {
     const { releaseDir, envFile } = await createFixture({ marker: true });
 
     const advisory = await runOperatorStatus(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => false,
         gitStatus: async () => ({ status: "clean" }),
@@ -59,7 +59,7 @@ describe("operator-status", () => {
       }
     );
     const strict = await runOperatorStatus(
-      { version: "0.2.0", releaseDir, requireCosign: true },
+      { version: "0.3.0", releaseDir, requireCosign: true },
       {
         commandExists: async () => false,
         gitStatus: async () => ({ status: "clean" }),
@@ -77,7 +77,7 @@ describe("operator-status", () => {
     const { releaseDir, envFile } = await createFixture({ marker: true });
 
     const report = await runOperatorStatus(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "unknown", reason: "not a git repository" }),
@@ -94,7 +94,7 @@ describe("operator-status", () => {
     const { releaseDir, envFile } = await createFixture({ marker: true });
 
     const report = await runOperatorStatus(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "clean" }),
@@ -132,15 +132,15 @@ async function createFixture({ marker }) {
   const releaseDir = path.join(temp, "release");
   const envFile = path.join(temp, ".env.staging");
   await fs.mkdir(releaseDir, { recursive: true });
-  await fs.writeFile(path.join(releaseDir, "release-manifest.json"), JSON.stringify({ version: "0.2.0" }), "utf8");
+  await fs.writeFile(path.join(releaseDir, "release-manifest.json"), JSON.stringify({ version: "0.3.0" }), "utf8");
   await fs.writeFile(path.join(releaseDir, "checksums.sha256"), "abc  release-manifest.json\n", "utf8");
   await fs.writeFile(path.join(releaseDir, "sbom.cyclonedx.json"), JSON.stringify({ bomFormat: "CycloneDX" }), "utf8");
-  await fs.writeFile(envFile, "APP_VERSION=0.2.0\n", "utf8");
+  await fs.writeFile(envFile, "APP_VERSION=0.3.0\n", "utf8");
   if (marker) {
     await fs.writeFile(
       path.join(releaseDir, "staging-verification.json"),
       JSON.stringify({
-        version: "0.2.0",
+        version: "0.3.0",
         verifiedAt: new Date().toISOString(),
         baseUrl: "http://localhost:4000",
         checksPassed: ["health", "ready", "version"],

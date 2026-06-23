@@ -1,7 +1,7 @@
 {
   "name": "unified-ai-workspace",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local-first browser automation workspace for personal AI accounts.",
   "scripts": {
     "dev": "corepack pnpm --parallel --filter @uaiw/web --filter @uaiw/api --filter @uaiw/worker dev",
@@ -38,6 +38,9 @@
     "provider-diagnostics-drift:cleanup": "node tools/cleanup/provider-diagnostics-drift.mjs",
     "provider-recovery-overrides:expire": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/tools/expireProviderRecoveryOverrides.ts",
     "workspace:invites:expire": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/expire-invites.ts",
+    "workspace:quota-alerts:run": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/quota-alerts.ts",
+    "workspace:quota-events:cleanup": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/quota-events-cleanup.ts",
+    "workspace:governance:backfill": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/governance-backfill.ts",
     "release:check": "node tools/release/check.mjs",
     "release:notes": "node tools/release/notes.mjs",
     "release:package": "node tools/release/package.mjs",

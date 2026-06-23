@@ -27,7 +27,10 @@ describe("notificationPreferenceService", () => {
       notifyProviderSessionIssues: true,
       notifyNoUsableModels: true,
       notifyProviderLimitSpikes: true,
-      providerLimitSpikeThreshold24h: 10
+      providerLimitSpikeThreshold24h: 10,
+      notifyWorkspaceQuotaWarnings: true,
+      notifyWorkspaceQuotaExceeded: true,
+      workspaceQuotaWarningThresholdPercent: 90
     });
   });
 
@@ -43,7 +46,10 @@ describe("notificationPreferenceService", () => {
       notifyProviderSessionIssues: false,
       notifyNoUsableModels: false,
       notifyProviderLimitSpikes: false,
-      providerLimitSpikeThreshold24h: 25
+      providerLimitSpikeThreshold24h: 25,
+      notifyWorkspaceQuotaWarnings: true,
+      notifyWorkspaceQuotaExceeded: true,
+      workspaceQuotaWarningThresholdPercent: 90
     });
   });
 

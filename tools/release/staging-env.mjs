@@ -105,7 +105,7 @@ export async function generateStagingEnv(options = {}, deps = {}) {
     copiedPlaceholderKeysCount: rendered.copiedPlaceholderKeys.length,
     generatedKeys: rendered.generatedKeys,
     copiedPlaceholderKeys: rendered.copiedPlaceholderKeys,
-    nextCommand: `corepack pnpm release:staging:local --env-file ${redactPath(outPath)} --expected-version ${rendered.values.APP_VERSION || "0.2.0"} --base-url ${rendered.values.API_BASE_URL || "http://localhost:4000"} --down`
+    nextCommand: `corepack pnpm release:staging:local --env-file ${redactPath(outPath)} --expected-version ${rendered.values.APP_VERSION || "0.3.0"} --base-url ${rendered.values.API_BASE_URL || "http://localhost:4000"} --down`
   };
 }
 

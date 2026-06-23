@@ -47,6 +47,17 @@ vi.mock("../../../lib/api", async () => {
     getManagedUsers: vi.fn(async () => ({ users: state.users })),
     getWorkspaceAuditEvents: vi.fn(async () => ({ events: [] })),
     getWorkspaceInviteExpirySchedulerStatus: vi.fn(async () => null),
+    getWorkspaceInviteEmailDeliveryStatus: vi.fn(async () => ({
+      enabled: false,
+      provider: "noop",
+      dryRun: true,
+      canAttemptSend: false,
+      realSendPossible: false,
+      missingRequiredConfig: [],
+      warnings: [],
+      fromConfigured: false,
+      baseUrlConfigured: false
+    })),
     updateManagedUserRole: state.updateManagedUserRole,
     listWorkspaceInvites: vi.fn(async () => ({ invites: [] })),
     createWorkspaceInvite: vi.fn(),
@@ -93,6 +104,7 @@ describe("UsersAndRolesPage permissions", () => {
     render(<UsersAndRolesPage />);
 
     expect(await screen.findByText("Read-only access")).toBeInTheDocument();
+    expect(await screen.findByText("Member One")).toBeInTheDocument();
     expect(screen.getByLabelText(/role for member one/i)).toBeDisabled();
   });
 

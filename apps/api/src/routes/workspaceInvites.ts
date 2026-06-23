@@ -11,9 +11,11 @@ import {
   WorkspaceInviteError
 } from "../services/workspaceInviteService.js";
 import { prisma } from "../services/prisma.js";
-import { renderInviteEmailPreview } from "../services/workspaceInviteTemplateService.js";
-import { recordInviteEmailNoop } from "../services/workspaceInviteDeliveryService.js";
 import { env } from "../config/env.js";
+import { deliverInviteEmail } from "../services/workspaceInviteDeliveryService.js";
+import { renderInviteEmailPreview } from "../services/workspaceInviteTemplateService.js";
+import { getWorkspaceInviteEmailDeliveryPreflight } from "../services/email/emailDeliveryPreflightService.js";
+import { createEmailProvider } from "../services/email/emailProvider.js";
 
 const inviteCreateBody = z.object({
   email: z.string().email(),
@@ -36,16 +38,41 @@ const acceptBody = z.object({
   token: z.string().min(1)
 });
 
+const deliveryTestBody = z.object({
+  email: z.string().email().optional(),
+  allowRealSendTest: z.boolean().optional()
+});
+
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   app.addHook("preHandler", attachLocalUser);
 
   app.get("/settings/workspace/invites", async (request, reply) => {
     if (!(await requirePermission(request, reply, "users.read"))) return;
     try {
-      const invites = await listWorkspaceInvites({
-        workspaceId: request.workspaceContext!.workspaceId
+      const list = await prisma.workspaceInvite.findMany({
+        where: { workspaceId: request.workspaceContext!.workspaceId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          deliveryAttempts: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              status: true,
+              channel: true,
+              reason: true,
+              createdAt: true
+            }
+          }
+        }
       });
-      return reply.send({ invites });
+
+      return reply.send({
+        invites: list.map(invite => ({
+          ...invite,
+          tokenHash: undefined, // ensure hash is scrubbed
+          latestDelivery: invite.deliveryAttempts[0] || null
+        }))
+      });
     } catch (error) {
       return sendInviteError(reply, error);
     }
@@ -71,6 +98,87 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get("/settings/workspace/invites/email-delivery-status", async (request, reply) => {
+    if (!(await requirePermission(request, reply, "users.read"))) return;
+    try {
+      const preflight = getWorkspaceInviteEmailDeliveryPreflight(env);
+      return reply.send(preflight);
+    } catch (error) {
+      return sendInviteError(reply, error);
+    }
+  });
+
+  app.get("/settings/workspace/invites/:inviteId/delivery-attempts", async (request, reply) => {
+    if (!(await requirePermission(request, reply, "users.manageRoles"))) return;
+    try {
+      const { inviteId } = inviteParams.parse(request.params);
+      const attempts = await prisma.workspaceInviteDeliveryAttempt.findMany({
+        where: {
+          workspaceId: request.workspaceContext!.workspaceId,
+          inviteId
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          channel: true,
+          status: true,
+          recipientEmailRedacted: true,
+          reason: true,
+          createdAt: true
+        }
+      });
+      return reply.send({ attempts });
+    } catch (error) {
+      if (error instanceof z.ZodError) return reply.code(400).send({ error: "invalid_input" });
+      return sendInviteError(reply, error);
+    }
+  });
+
+  app.post("/settings/workspace/invites/email-delivery-test", async (request, reply) => {
+    if (!(await requirePermission(request, reply, "users.manageRoles"))) return;
+    try {
+      const body = deliveryTestBody.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "invalid_input" });
+
+      const emailToUse = body.data.email || request.user?.email;
+      if (!emailToUse) {
+        return reply.code(400).send({ error: "invalid_email" });
+      }
+
+      const preflight = getWorkspaceInviteEmailDeliveryPreflight(env);
+      const provider = createEmailProvider(env);
+
+      const testSubject = "Unified AI Workspace email delivery test";
+      const testText = "This is a test email from Unified AI Workspace. It contains no invite tokens.";
+      const testHtml = "<p>This is a test email from Unified AI Workspace. It contains no invite tokens.</p>";
+
+      // We only send if allowRealSendTest is explicitly true and preflight allows it
+      if (body.data.allowRealSendTest && preflight.realSendPossible) {
+        const result = await provider.send({
+          to: emailToUse,
+          subject: testSubject,
+          text: testText,
+          html: testHtml
+        });
+        return reply.send({
+          status: result.status,
+          provider: result.provider,
+          error: result.error
+        });
+      }
+
+      // Default behavior: dry-run or preflight preview
+      return reply.send({
+        status: "skipped_test_mode",
+        provider: preflight.provider,
+        testSubject,
+        testText
+      });
+    } catch (error) {
+      return sendInviteError(reply, error);
+    }
+  });
+
   app.post("/settings/workspace/invites", async (request, reply) => {
     if (!(await requirePermission(request, reply, "users.manageRoles"))) return;
     try {
@@ -91,29 +199,30 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       const workspace = await prisma.workspace.findUnique({ where: { id: request.workspaceContext!.workspaceId } });
       const actorUser = await prisma.user.findUnique({ where: { id: request.user.id } });
 
-      const emailPreview = renderInviteEmailPreview({
+      const emailTemplate = renderInviteEmailPreview({
         workspaceName: workspace?.name || "Unified AI Workspace",
         inviterName: actorUser?.displayName || actorUser?.email || "A member",
         inviteeEmail: body.data.email,
         role: body.data.role,
         acceptUrl: inviteUrl,
-        expiresAt: new Date(result.invite.expiresAt)
+        expiresAt: new Date(result.invite.expiresAt),
+        deliveryEnabled: env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED
       });
 
-      const delivery = await recordInviteEmailNoop({
+      const delivery = await deliverInviteEmail({
         workspaceId: request.workspaceContext!.workspaceId,
         inviteId: result.invite.id,
         inviteeEmail: body.data.email,
-        role: body.data.role,
-        expiresAt: new Date(result.invite.expiresAt),
-        templatePreviewSafe: true
+        subject: emailTemplate.subject,
+        text: emailTemplate.text,
+        html: emailTemplate.html
       });
 
       return reply.send({
         invite: result.invite,
         token: result.rawToken,
         inviteUrl,
-        emailPreview,
+        emailPreview: emailTemplate,
         delivery: {
           channel: delivery.channel,
           status: delivery.status
@@ -141,7 +250,8 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         inviteeEmail: body.data.email,
         role: body.data.role,
         acceptUrl: "[invite link shown after creation]",
-        expiresAt
+        expiresAt,
+        deliveryEnabled: env.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED
       });
 
       return reply.send({ emailPreview });

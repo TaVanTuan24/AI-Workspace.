@@ -5,6 +5,18 @@ export interface SafeProviderError {
   message: string;
 }
 
+export class SafeError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly statusCode: number = 400,
+    public readonly details?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'SafeError';
+  }
+}
+
 export function toSafeProviderError(error: unknown, provider: ProviderId = "gemini"): SafeProviderError {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const displayName = provider === "chatgpt" ? "ChatGPT" : provider === "grok" ? "Grok" : "Gemini";

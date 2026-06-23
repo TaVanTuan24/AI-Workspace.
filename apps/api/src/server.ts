@@ -24,9 +24,15 @@ import { providerRecoveryPolicyRoutes } from "./routes/providerRecoveryPolicies.
 import { userRoutes } from "./routes/users.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 import { workspaceInviteRoutes } from "./routes/workspaceInvites.js";
+import { workspaceQuotaRoutes } from "./routes/workspaceQuota.js";
+import { workspaceActivityRoutes } from "./routes/workspaceActivity.js";
+import { workspaceAdminOverviewRoutes } from "./routes/workspaceAdminOverview.js";
+import { workspaceSchedulerRoutes } from "./routes/workspaceSchedulers.js";
+import { workspaceAdminExportRoutes } from "./routes/workspaceAdminExport.js";
 import { providerHealthScheduler } from "./services/providerHealthScheduler.js";
 import { providerRecoveryOverrideExpiryScheduler } from "./services/providerRecoveryOverrideExpiryScheduler.js";
 import { workspaceInviteExpiryScheduler } from "./services/workspaceInviteExpiryScheduler.js";
+import { workspaceQuotaAlertScheduler } from "./services/workspaceQuotaAlertScheduler.js";
 import { healthRoutes } from "./routes/health.js";
 import { prisma } from "./services/prisma.js";
 import { closeChatQueue } from "./services/chatQueue.js";
@@ -71,12 +77,18 @@ await app.register(providerRecoveryPolicyRoutes);
 await app.register(userRoutes);
 await app.register(workspaceRoutes);
 await app.register(workspaceInviteRoutes);
+await app.register(workspaceQuotaRoutes);
+await app.register(workspaceActivityRoutes);
+await app.register(workspaceAdminOverviewRoutes);
+await app.register(workspaceSchedulerRoutes);
+await app.register(workspaceAdminExportRoutes);
 
 app.addHook("onClose", async () => {
   await Promise.allSettled([
     providerHealthScheduler.stop(),
     providerRecoveryOverrideExpiryScheduler.stop(),
-    workspaceInviteExpiryScheduler.stop()
+    workspaceInviteExpiryScheduler.stop(),
+    workspaceQuotaAlertScheduler.stop()
   ]);
   await Promise.allSettled([
     closeChatQueue(),
@@ -120,6 +132,7 @@ try {
   providerHealthScheduler.start();
   providerRecoveryOverrideExpiryScheduler.start();
   workspaceInviteExpiryScheduler.start();
+  workspaceQuotaAlertScheduler.start();
 } catch (error) {
   app.log.error({ err: error }, "API startup failed");
   await app.close().catch(() => {});

@@ -10,7 +10,7 @@ describe("tag-dry-run", () => {
   it("passes required release checks while warning on missing marker and cosign", async () => {
     const releaseDir = await createReleaseDir({ includeSbom: true });
     const report = await runTagDryRun(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => false,
         gitStatus: async () => ({ status: "clean" }),
@@ -26,13 +26,13 @@ describe("tag-dry-run", () => {
     assert.equal(report.nextSteps.some((command) => command.includes("release:operator:status")), true);
     assert.equal(report.nextSteps.some((command) => command.includes("RELEASE_OPERATOR_HANDOFF")), true);
     assert.match(formatSummary(report), /release:staging:local/);
-    assert.equal(report.manualCommands.some((command) => command.startsWith("git tag -a v0.2.0")), true);
+    assert.equal(report.manualCommands.some((command) => command.startsWith("git tag -a v0.3.0")), true);
   });
 
   it("fails when SBOM is missing", async () => {
     const releaseDir = await createReleaseDir({ includeSbom: false });
     const report = await runTagDryRun(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "clean" }),
@@ -64,7 +64,7 @@ describe("tag-dry-run", () => {
     await fs.writeFile(
       path.join(releaseDir, "staging-verification.json"),
       JSON.stringify({
-        version: "0.2.0",
+        version: "0.3.0",
         verifiedAt: new Date().toISOString(),
         baseUrl: "http://localhost:4000",
         checksPassed: ["health", "ready", "version", "health-details"],
@@ -75,7 +75,7 @@ describe("tag-dry-run", () => {
     );
 
     const report = await runTagDryRun(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "clean" })
@@ -91,7 +91,7 @@ describe("tag-dry-run", () => {
   it("prints Docker resume guidance when preflight status says daemon unavailable", async () => {
     const releaseDir = await createReleaseDir({ includeSbom: true });
     const report = await runTagDryRun(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "clean" }),
@@ -119,7 +119,7 @@ describe("tag-dry-run", () => {
   it("warns that final tag must be run in a real Git checkout", async () => {
     const releaseDir = await createReleaseDir({ includeSbom: true });
     const report = await runTagDryRun(
-      { version: "0.2.0", releaseDir },
+      { version: "0.3.0", releaseDir },
       {
         commandExists: async () => true,
         gitStatus: async () => ({ status: "unknown", reason: "not a git repository" }),
@@ -134,7 +134,7 @@ describe("tag-dry-run", () => {
 async function createReleaseDir({ includeSbom }) {
   const releaseDir = await fs.mkdtemp(path.join(os.tmpdir(), "uaiw-release-"));
   const files = {
-    "release-manifest.json": JSON.stringify({ name: "unified-ai-workspace", version: "0.2.0", files: [] }, null, 2) + "\n"
+    "release-manifest.json": JSON.stringify({ name: "unified-ai-workspace", version: "0.3.0", files: [] }, null, 2) + "\n"
   };
   if (includeSbom) files["sbom.cyclonedx.json"] = JSON.stringify({ bomFormat: "CycloneDX" }) + "\n";
 

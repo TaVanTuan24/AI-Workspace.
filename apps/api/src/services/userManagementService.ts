@@ -184,6 +184,42 @@ export async function listWorkspaceAuditEvents({
   }));
 }
 
+export async function recordUserRoleAuditEvent({
+  workspaceId,
+  actorUserId,
+  targetUserId,
+  action,
+  previousRole,
+  nextRole,
+  previousStatus,
+  nextStatus,
+  inviteId
+}: {
+  workspaceId: string;
+  actorUserId: string;
+  targetUserId?: string | null;
+  action: string;
+  previousRole?: string | null;
+  nextRole?: string | null;
+  previousStatus?: string | null;
+  nextStatus?: string | null;
+  inviteId?: string | null;
+}) {
+  return prisma.userRoleAuditEvent.create({
+    data: {
+      workspaceId,
+      actorUserId,
+      targetUserId,
+      action,
+      previousRole,
+      nextRole,
+      previousStatus,
+      nextStatus,
+      inviteId
+    }
+  });
+}
+
 function toUserManagementView(membership: {
   role: string;
   status: string;

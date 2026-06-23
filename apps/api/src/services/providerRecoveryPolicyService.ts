@@ -7,6 +7,7 @@ import {
   createRecoveryOverride,
   isRecoveryActionType
 } from "./providerRecoveryOverrideService.js";
+import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export const PROVIDER_RECOVERY_TRIGGER_TYPES = [
   "provider_incident_opened",
@@ -164,11 +165,21 @@ export async function createProviderRecoveryPolicy(
   userId: string,
   input: ProviderRecoveryPolicyInput
 ): Promise<ProviderRecoveryPolicyView> {
+  const workspaceId = (await prisma.user.findUnique({ where: { id: userId } }))?.workspaceId || null;
+  if (workspaceId) {
+    await assertWorkspaceQuota({
+      workspaceId,
+      resource: 'recoveryPolicies',
+      actorUserId: userId,
+      source: 'recovery_policy_create'
+    });
+  }
+
   const normalized = normalizePolicyInput(input);
   const created = await prisma.providerRecoveryPolicy.create({
     data: {
       userId,
-      workspaceId: (await prisma.user.findUnique({ where: { id: userId } }))?.workspaceId || null,
+      workspaceId,
       name: normalized.name,
       enabled: normalized.enabled,
       triggerTypes: jsonString(normalized.triggerTypes),

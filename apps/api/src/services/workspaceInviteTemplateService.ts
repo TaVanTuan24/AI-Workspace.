@@ -7,6 +7,7 @@ export interface RenderInviteEmailParams {
   role: string;
   acceptUrl?: string;
   expiresAt: Date;
+  deliveryEnabled?: boolean;
 }
 
 export interface RenderInviteEmailResult {
@@ -21,7 +22,8 @@ export function renderInviteEmailPreview({
   inviteeEmail,
   role,
   acceptUrl,
-  expiresAt
+  expiresAt,
+  deliveryEnabled
 }: RenderInviteEmailParams): RenderInviteEmailResult {
   const safeWorkspace = escape(workspaceName);
   const safeInviter = escape(inviterName);
@@ -43,8 +45,10 @@ export function renderInviteEmailPreview({
     textLines.push(`To accept the invite, please click the link below:`);
     textLines.push(acceptUrl);
     textLines.push(``);
-    textLines.push(`Note: Email delivery is not configured yet. This link was shown when the invite was created.`);
-  } else {
+    if (!deliveryEnabled) {
+      textLines.push(`Note: Email delivery is not configured yet. This link was shown when the invite was created.`);
+    }
+  } else if (!deliveryEnabled) {
     textLines.push(`Note: Email delivery is not configured yet. Please ask the workspace owner for the invite link.`);
   }
 
@@ -60,9 +64,11 @@ export function renderInviteEmailPreview({
     htmlBody += `
       <p>To accept the invite, please click the link below:</p>
       <p><a href="${escape(acceptUrl)}">${escape(acceptUrl)}</a></p>
-      <p><em>Note: Email delivery is not configured yet. This link was shown when the invite was created.</em></p>
     `;
-  } else {
+    if (!deliveryEnabled) {
+      htmlBody += `<p><em>Note: Email delivery is not configured yet. This link was shown when the invite was created.</em></p>`;
+    }
+  } else if (!deliveryEnabled) {
     htmlBody += `
       <p><em>Note: Email delivery is not configured yet. Please ask the workspace owner for the invite link.</em></p>
     `;
