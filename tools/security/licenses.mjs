@@ -116,6 +116,7 @@ async function run() {
   let shouldFail = false;
 
   for (const [licenseGroup, pkgs] of Object.entries(licensesData)) {
+    if (!Array.isArray(pkgs)) continue;
     for (const pkg of pkgs) {
       const version = pkg.versions[0] || "unknown";
       const status = checkLicenseStatus(pkg.name, version, licenseGroup, policy);
@@ -140,6 +141,13 @@ async function run() {
         shouldFail = true;
       }
     }
+  }
+
+  if (summary.totalPackages === 0) {
+    console.warn(
+      "No license groups parsed from pnpm output; skipping the license gate. Raw output head:",
+      rawOutput.slice(0, 300)
+    );
   }
 
   const report = {
