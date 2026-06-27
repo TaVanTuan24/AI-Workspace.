@@ -4,6 +4,8 @@
   "version": "0.3.0",
   "description": "Local-first browser automation workspace for personal AI accounts.",
   "scripts": {
+    "build:packages": "corepack pnpm --filter \"./packages/*\" build",
+    "predev": "corepack pnpm build:packages",
     "dev": "corepack pnpm --parallel --filter @uaiw/web --filter @uaiw/api --filter @uaiw/worker dev",
     "dev:web": "corepack pnpm --filter @uaiw/web dev",
     "dev:api": "corepack pnpm --filter @uaiw/api dev",

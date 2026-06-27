@@ -31,4 +31,4 @@ ENV BUILD_TIME=$BUILD_TIME
 ENV BUILD_SOURCE=$BUILD_SOURCE
 
 USER pwuser
-CMD ["node", "apps/worker/dist/worker.js"]
+CMD ["node", "apps/worker/dist/worker/src/worker.js"]

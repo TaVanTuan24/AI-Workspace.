@@ -12,9 +12,12 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@uaiw/shared/*": ["packages/shared/src/*"],
-      "@uaiw/session-vault/*": ["packages/session-vault/src/*"],
-      "@uaiw/provider-adapters/*": ["packages/provider-adapters/src/*"]
+      "@uaiw/shared": ["packages/shared/dist/index.d.ts"],
+      "@uaiw/shared/*": ["packages/shared/dist/*"],
+      "@uaiw/session-vault": ["packages/session-vault/dist/index.d.ts"],
+      "@uaiw/session-vault/*": ["packages/session-vault/dist/*"],
+      "@uaiw/provider-adapters": ["packages/provider-adapters/dist/index.d.ts"],
+      "@uaiw/provider-adapters/*": ["packages/provider-adapters/dist/*"]
     }
   }
 }

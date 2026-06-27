@@ -36,6 +36,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Build internal packages
+        run: pnpm --filter "./packages/*" build
+
       - name: Prisma generate
         run: pnpm exec prisma generate
 
