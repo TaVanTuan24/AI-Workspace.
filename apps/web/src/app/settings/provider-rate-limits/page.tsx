@@ -19,7 +19,7 @@ import {
 const providerLabels: Record<ProviderId, string> = {
   chatgpt: "ChatGPT",
   gemini: "Gemini",
-  grok: "Grok"
+  claude: "Claude"
 };
 
 export default function ProviderRateLimitsPage() {

@@ -55,7 +55,7 @@ const analyticsFixture = {
   totalHits: 1,
   byProvider: [
     { provider: "chatgpt" as const, hits: 1 },
-    { provider: "grok" as const, hits: 0 },
+    { provider: "claude" as const, hits: 0 },
     { provider: "gemini" as const, hits: 0 }
   ],
   byModel: [{ provider: "chatgpt" as const, modelId: "chatgpt-web", hits: 1 }],

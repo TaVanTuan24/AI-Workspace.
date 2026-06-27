@@ -16,7 +16,7 @@ vi.mock("../providerHealthService.js", () => {
     getProviderHealth: vi.fn().mockResolvedValue([
       { provider: "chatgpt", isUsable: true, healthStatus: "healthy" },
       { provider: "gemini", isUsable: false, healthStatus: "requires_login" },
-      { provider: "grok", isUsable: true, healthStatus: "healthy" }
+      { provider: "claude", isUsable: true, healthStatus: "healthy" }
     ])
   };
 });
@@ -66,7 +66,7 @@ describe("modelPreferenceService", () => {
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
         { modelId: "gemini-web", enabled: false, isDefault: false, priority: 20 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 30 }
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 30 }
       ]
     });
 
@@ -109,14 +109,14 @@ describe("modelPreferenceService", () => {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "gemini-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 20 },
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 },
         { modelId: "chatgpt-web", enabled: true, isDefault: false, priority: 30 }
       ]
     });
 
     const resolved = await resolveDefaultModel(userId);
-    // Since gemini is not usable, and auto fallback is true, it should pick the next highest priority usable model -> grok
-    expect(resolved).toBe("grok-web");
+    // Since gemini is not usable, and auto fallback is true, it should pick the next highest priority usable model -> claude
+    expect(resolved).toBe("claude-web");
   });
 
   it("should not fallback if autoSelectFirstUsable is false", async () => {
@@ -125,7 +125,7 @@ describe("modelPreferenceService", () => {
       autoSelectFirstUsable: false,
       models: [
         { modelId: "gemini-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 20 }
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
       ]
     });
 
@@ -139,7 +139,7 @@ describe("modelPreferenceService", () => {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 20 }
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
       ]
     });
     await createRecoveryOverride({
@@ -167,7 +167,7 @@ describe("modelPreferenceService", () => {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 20 }
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
       ]
     });
     await prisma.providerRecoveryOverride.create({
@@ -197,7 +197,7 @@ describe("modelPreferenceService", () => {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "grok-web", enabled: true, isDefault: false, priority: 20 }
+        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
       ]
     });
     await createRecoveryOverride({
@@ -207,26 +207,26 @@ describe("modelPreferenceService", () => {
       durationMinutes: 30,
       overrideState: {
         onlyIfProvider: "chatgpt",
-        fallbackProviderOrder: ["grok", "gemini"]
+        fallbackProviderOrder: ["claude", "gemini"]
       }
     });
 
-    await expect(resolveDefaultModel(userId)).resolves.toBe("grok-web");
+    await expect(resolveDefaultModel(userId)).resolves.toBe("claude-web");
   });
 
   it("blocks provider only when degraded mode is block_for_duration", async () => {
     await createRecoveryOverride({
       userId,
       actionType: "mark_provider_temporarily_degraded",
-      provider: "grok",
+      provider: "claude",
       durationMinutes: 30,
       overrideState: { mode: "block_for_duration" }
     });
 
     const prefs = await getModelPreferences(userId);
-    const grok = prefs.models.find(m => m.modelId === "grok-web");
-    expect(grok?.isUsable).toBe(false);
-    expect(grok?.recovery.providerDegraded).toBe(true);
-    expect(grok?.recovery.degradedMode).toBe("block_for_duration");
+    const claude = prefs.models.find(m => m.modelId === "claude-web");
+    expect(claude?.isUsable).toBe(false);
+    expect(claude?.recovery.providerDegraded).toBe(true);
+    expect(claude?.recovery.degradedMode).toBe("block_for_duration");
   });
 });

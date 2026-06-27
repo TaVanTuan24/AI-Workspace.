@@ -358,7 +358,7 @@ function WelcomeStep({ status, onStart }: { status: OnboardingStatus; onStart: (
       <div>
         <h2 className="text-2xl font-semibold">Set up your local AI workspace</h2>
         <p className="mt-3 text-muted">
-          Unified AI Workspace uses your own ChatGPT, Gemini, and Grok sessions through direct provider login. It does not ask for provider passwords or bypass challenges.
+          Unified AI Workspace uses your own ChatGPT, Gemini, and Claude sessions through direct provider login. It does not ask for provider passwords or bypass challenges.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Feature icon={ShieldCheck} title="Private sessions" text="Provider sessions stay encrypted at rest." />

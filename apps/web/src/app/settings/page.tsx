@@ -40,7 +40,7 @@ const quickLinks = [
   {
     href: "/settings/connections",
     label: "Manage connections",
-    description: "Connect or disconnect ChatGPT, Gemini, and Grok.",
+    description: "Connect or disconnect ChatGPT, Gemini, and Claude.",
     icon: Cable
   },
   {
@@ -64,7 +64,7 @@ const quickLinks = [
   {
     href: "/settings/provider-rate-limits",
     label: "Provider limits",
-    description: "Set ChatGPT, Gemini, and Grok caps before automation jobs enqueue.",
+    description: "Set ChatGPT, Gemini, and Claude caps before automation jobs enqueue.",
     icon: TimerReset
   },
   {

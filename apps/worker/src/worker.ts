@@ -209,7 +209,7 @@ async function markWorkerFailure(
 }
 
 function isKnownProvider(provider: string): provider is ProviderId {
-  return provider === "gemini" || provider === "chatgpt" || provider === "grok";
+  return provider === "gemini" || provider === "chatgpt" || provider === "claude";
 }
 
 function redactRedisUrl(value: string): string {

@@ -64,7 +64,7 @@ const MAX_OVERRIDE_DURATION_MINUTES = 10080;
 const MODEL_BY_PROVIDER: Record<ProviderId, string> = {
   chatgpt: "chatgpt-web",
   gemini: "gemini-web",
-  grok: "grok-web"
+  claude: "claude-web"
 };
 
 export interface ProviderRecoveryActionInput {

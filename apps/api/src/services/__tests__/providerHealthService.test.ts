@@ -67,14 +67,14 @@ describe("providerHealthService", () => {
     await prisma.providerConnection.create({
       data: {
         userId,
-        provider: "grok",
+        provider: "claude",
         status: "connected",
         browserProfileId: "dummy",
         encryptedSessionBlob: null // No session blob
       }
     });
 
-    const result = await refreshProviderHealth(userId, "grok");
+    const result = await refreshProviderHealth(userId, "claude");
     expect(result.connectionStatus).toBe("requires_login");
     expect(result.healthStatus).toBe("requires_login");
     expect(result.isUsable).toBe(false);

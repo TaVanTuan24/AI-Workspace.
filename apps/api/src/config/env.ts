@@ -23,7 +23,7 @@ const envSchema = z.object({
   PROVIDER_RATE_LIMIT_MAX_PER_MINUTE: z.coerce.number().int().positive().default(300),
   PROVIDER_RATE_LIMIT_CHATGPT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   PROVIDER_RATE_LIMIT_GEMINI_PER_MINUTE: z.coerce.number().int().positive().default(30),
-  PROVIDER_RATE_LIMIT_GROK_PER_MINUTE: z.coerce.number().int().positive().default(10),
+  PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE: z.coerce.number().int().positive().default(10),
   API_KEY_HASH_SECRET: z.string().optional(),
   ENABLE_DB_API_KEYS: z.coerce.boolean().default(false),
   API_USAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
@@ -120,7 +120,7 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
   const providerLimits = [
     ["PROVIDER_RATE_LIMIT_CHATGPT_PER_MINUTE", parsed.PROVIDER_RATE_LIMIT_CHATGPT_PER_MINUTE],
     ["PROVIDER_RATE_LIMIT_GEMINI_PER_MINUTE", parsed.PROVIDER_RATE_LIMIT_GEMINI_PER_MINUTE],
-    ["PROVIDER_RATE_LIMIT_GROK_PER_MINUTE", parsed.PROVIDER_RATE_LIMIT_GROK_PER_MINUTE]
+    ["PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE", parsed.PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE]
   ] as const;
   for (const [name, value] of providerLimits) {
     if (value > parsed.PROVIDER_RATE_LIMIT_MAX_PER_MINUTE) {

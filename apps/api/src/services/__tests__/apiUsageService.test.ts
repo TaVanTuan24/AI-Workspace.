@@ -80,8 +80,8 @@ describe("apiUsageService", () => {
   it("should log a rate limit hit safely", async () => {
     await logRateLimitHit({
       userId: "test-user-usage", workspaceId: "test-ws",
-      model: "grok-web",
-      provider: "grok",
+      model: "claude-web",
+      provider: "claude",
       endpoint: "/v1/chat/completions",
       requestId: "req_rl"
     });
@@ -136,7 +136,7 @@ describe("apiUsageService", () => {
     expect(analytics.totalHits).toBe(0);
     expect(analytics.byProvider).toEqual([
       { provider: "chatgpt", hits: 0 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]);
   });
@@ -155,13 +155,13 @@ describe("apiUsageService", () => {
 
     await createProviderLimitLog({ provider: "chatgpt", model: "chatgpt-web", apiKeyId: key.id, apiKeyPrefix: key.keyPrefix });
     await createProviderLimitLog({ provider: "chatgpt", model: "chatgpt-web", apiKeyId: key.id, apiKeyPrefix: key.keyPrefix });
-    await createProviderLimitLog({ provider: "grok", model: "grok-web" });
+    await createProviderLimitLog({ provider: "claude", model: "claude-web" });
 
     const analytics = await getProviderLimitAnalytics("test-user-usage", { range: "24h" });
 
     expect(analytics.totalHits).toBe(3);
     expect(analytics.byProvider).toContainEqual({ provider: "chatgpt", hits: 2 });
-    expect(analytics.byProvider).toContainEqual({ provider: "grok", hits: 1 });
+    expect(analytics.byProvider).toContainEqual({ provider: "claude", hits: 1 });
     expect(analytics.byModel).toContainEqual({ provider: "chatgpt", modelId: "chatgpt-web", hits: 2 });
     expect(analytics.byApiKey).toContainEqual({
       apiKeyId: key.id,
@@ -266,8 +266,8 @@ describe("apiUsageService", () => {
     });
     await logProviderRateLimitHit({
       userId: "test-user-usage", workspaceId: "test-ws",
-      provider: "grok",
-      modelId: "grok-web",
+      provider: "claude",
+      modelId: "claude-web",
       source: "openai_compat",
       limitPerMinute: 10,
       apiKeyId: key.id,
@@ -276,7 +276,7 @@ describe("apiUsageService", () => {
     });
 
     const record = await prisma.internalApiUsageLog.findFirst({
-      where: { userId: "test-user-usage", workspaceId: "test-ws", provider: "grok" }
+      where: { userId: "test-user-usage", workspaceId: "test-ws", provider: "claude" }
     });
     expect(record).toMatchObject({
       apiKeyId: key.id,
@@ -348,7 +348,7 @@ describe("apiUsageService", () => {
 });
 
 async function createProviderLimitLog(input: {
-  provider: "chatgpt" | "grok" | "gemini";
+  provider: "chatgpt" | "claude" | "gemini";
   model: string;
   requestId?: string;
   apiKeyId?: string;

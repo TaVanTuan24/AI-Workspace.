@@ -33,8 +33,8 @@ function getProviderKeywords(provider: ProviderId): RegExp[] {
       return [/gpt/i, /o3/i, /o1/i, /reasoning/i, /mini/i, /alpha/i, /legacy/i];
     case "gemini":
       return [/gemini/i, /flash/i, /pro/i, /thinking/i, /experimental/i];
-    case "grok":
-      return [/grok/i, /think/i, /deepsearch/i, /beta/i];
+    case "claude":
+      return [/claude/i, /opus/i, /sonnet/i, /haiku/i, /thinking/i];
     default:
       return [];
   }

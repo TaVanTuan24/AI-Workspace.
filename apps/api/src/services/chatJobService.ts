@@ -14,7 +14,7 @@ export interface ProviderItemError {
 const MODEL_BY_PROVIDER: Record<ProviderId, string> = {
   chatgpt: "chatgpt-web",
   gemini: "gemini-web",
-  grok: "grok-web"
+  claude: "claude-web"
 };
 
 export async function validateRunnableProvider(

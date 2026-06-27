@@ -200,7 +200,7 @@ export async function runSafeDomDiagnostics(page: Page, provider: ProviderId): P
     if (info.tagName === "BUTTON" || info.role === "button") pickerScore += 0.3;
     if (info.bounds && info.bounds.y < 200) pickerScore += 0.2; // Usually at the top
     const textOrAria = (info.innerTextPreview || "") + " " + (info.ariaLabel || "");
-    if (/(model|GPT|Gemini|Grok|Flash|Pro|reasoning)/i.test(textOrAria)) pickerScore += 0.4;
+    if (/(model|GPT|Gemini|Claude|Opus|Sonnet|Flash|Pro|reasoning)/i.test(textOrAria)) pickerScore += 0.4;
     
     if (pickerScore > 0.6) {
        candidates.push({

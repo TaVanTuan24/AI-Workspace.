@@ -40,13 +40,13 @@ const userId = "notifications-user";
 const healthyProviders = [
   providerHealth("chatgpt", "healthy", true),
   providerHealth("gemini", "healthy", true),
-  providerHealth("grok", "healthy", true)
+  providerHealth("claude", "healthy", true)
 ];
 
 const enabledModels = [
   modelPreference("chatgpt-web", "chatgpt", true, true),
   modelPreference("gemini-web", "gemini", true, true),
-  modelPreference("grok-web", "grok", true, true)
+  modelPreference("claude-web", "claude", true, true)
 ];
 
 const defaultNotificationPreferences = {
@@ -65,7 +65,7 @@ describe("workspaceNotificationService", () => {
     vi.mocked(getNotificationPreferences).mockResolvedValue(defaultNotificationPreferences);
     vi.mocked(getProviderLimitAnalytics).mockResolvedValue(providerLimitAnalytics([
       { provider: "chatgpt", hits: 0 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
   });
@@ -117,10 +117,10 @@ describe("workspaceNotificationService", () => {
 
   it("returns a critical notification for enabled provider UI changes", async () => {
     vi.mocked(getProviderHealth).mockResolvedValueOnce([
-      { ...providerHealth("grok", "error", false), errorCode: "PROVIDER_UI_CHANGED" }
+      { ...providerHealth("claude", "error", false), errorCode: "PROVIDER_UI_CHANGED" }
     ] as any);
     vi.mocked(getModelPreferences).mockResolvedValueOnce({
-      models: [modelPreference("grok-web", "grok", true, false)] as any,
+      models: [modelPreference("claude-web", "claude", true, false)] as any,
       autoSelectFirstUsable: true
     });
 
@@ -232,7 +232,7 @@ describe("workspaceNotificationService", () => {
     vi.mocked(getModelPreferences).mockResolvedValueOnce({ models: enabledModels as any, autoSelectFirstUsable: true });
     vi.mocked(getProviderLimitAnalytics).mockResolvedValueOnce(providerLimitAnalytics([
       { provider: "chatgpt", hits: 12 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
 
@@ -254,7 +254,7 @@ describe("workspaceNotificationService", () => {
     vi.mocked(getModelPreferences).mockResolvedValue({ models: enabledModels as any, autoSelectFirstUsable: true });
     vi.mocked(getProviderLimitAnalytics).mockResolvedValue(providerLimitAnalytics([
       { provider: "chatgpt", hits: 9 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
 
@@ -267,7 +267,7 @@ describe("workspaceNotificationService", () => {
     });
     vi.mocked(getProviderLimitAnalytics).mockResolvedValueOnce(providerLimitAnalytics([
       { provider: "chatgpt", hits: 12 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
 
@@ -280,14 +280,14 @@ describe("workspaceNotificationService", () => {
     vi.mocked(getModelPreferences).mockResolvedValue({ models: enabledModels as any, autoSelectFirstUsable: true });
     vi.mocked(getProviderLimitAnalytics).mockResolvedValueOnce(providerLimitAnalytics([
       { provider: "chatgpt", hits: 12 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
     const first = await getWorkspaceNotifications(userId);
 
     vi.mocked(getProviderLimitAnalytics).mockResolvedValueOnce(providerLimitAnalytics([
       { provider: "chatgpt", hits: 19 },
-      { provider: "grok", hits: 0 },
+      { provider: "claude", hits: 0 },
       { provider: "gemini", hits: 0 }
     ]) as any);
     const second = await getWorkspaceNotifications(userId);
@@ -301,7 +301,7 @@ describe("workspaceNotificationService", () => {
 function providerHealth(provider: string, status: string, isUsable: boolean, at = "2026-06-21T09:00:00.000Z") {
   return {
     provider,
-    displayName: provider === "chatgpt" ? "ChatGPT" : provider === "gemini" ? "Gemini" : "Grok",
+    displayName: provider === "chatgpt" ? "ChatGPT" : provider === "gemini" ? "Gemini" : "Claude",
     readiness: "ready",
     capabilities: ["send_message"],
     connectionStatus: status === "healthy" ? "connected" : status,

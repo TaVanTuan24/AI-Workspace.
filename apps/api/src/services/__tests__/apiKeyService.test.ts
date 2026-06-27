@@ -74,13 +74,13 @@ describe("apiKeyService with model scopes", () => {
     const { record } = await createApiKey({ userId, workspaceId, name: "Edit Me" });
     
     // Initially all allowed
-    expect(await isModelAllowedForApiKey(record.id, "grok-web")).toBe(true);
+    expect(await isModelAllowedForApiKey(record.id, "claude-web")).toBe(true);
 
     // Change to restricted
-    const updated = await setApiKeyModelScopes(userId, workspaceId, record.id, ["grok-web"]);
+    const updated = await setApiKeyModelScopes(userId, workspaceId, record.id, ["claude-web"]);
     expect(updated.scopeMode).toBe("restricted");
     
-    expect(await isModelAllowedForApiKey(record.id, "grok-web")).toBe(true);
+    expect(await isModelAllowedForApiKey(record.id, "claude-web")).toBe(true);
     expect(await isModelAllowedForApiKey(record.id, "chatgpt-web")).toBe(false);
 
     // Change back to unrestricted
@@ -102,6 +102,6 @@ describe("apiKeyService with model scopes", () => {
     expect(newKey.scopeMode).toBe("restricted");
     expect(newKey.allowedModels).toContain("gemini-web");
     expect(await isModelAllowedForApiKey(newKey.id, "gemini-web")).toBe(true);
-    expect(await isModelAllowedForApiKey(newKey.id, "grok-web")).toBe(false);
+    expect(await isModelAllowedForApiKey(newKey.id, "claude-web")).toBe(false);
   });
 });

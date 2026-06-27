@@ -4,7 +4,7 @@ import type {
   ProviderRecoveryOverrideView
 } from "../../../lib/api";
 
-const providerOptions = ["chatgpt", "gemini", "grok"];
+const providerOptions = ["chatgpt", "gemini", "claude"];
 
 export function RecoveryOverrideTable({
   overrides,
@@ -107,7 +107,7 @@ export function ActionConfigFields({
           <label className="block">
             <span className="text-xs text-slate-500">Fallback order</span>
             <input
-              value={Array.isArray(config.fallbackProviderOrder) ? config.fallbackProviderOrder.join(",") : "gemini,chatgpt,grok"}
+              value={Array.isArray(config.fallbackProviderOrder) ? config.fallbackProviderOrder.join(",") : "gemini,chatgpt,claude"}
               onChange={(event) => update({ fallbackProviderOrder: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) })}
               className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-indigo-500"
             />
@@ -146,7 +146,7 @@ export function defaultAction(type: ProviderRecoveryActionType) {
     return { type, enabled: true, config: { durationMinutes: 60, mode: "avoid_if_possible" } };
   }
   if (type === "prefer_fallback_provider") {
-    return { type, enabled: true, config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "chatgpt", "grok"] } };
+    return { type, enabled: true, config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "chatgpt", "claude"] } };
   }
   if (type === "disable_model_temporarily") {
     return { type, enabled: true, config: { durationMinutes: 60, modelId: "chatgpt-web", reason: "Provider UI drift detected" } };

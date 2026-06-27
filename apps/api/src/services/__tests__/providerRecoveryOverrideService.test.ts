@@ -103,9 +103,9 @@ describe("providerRecoveryOverrideService", () => {
       data: {
         userId,
         actionType: "disable_model_temporarily",
-        modelId: "grok-web",
+        modelId: "claude-web",
         status: "active",
-        overrideState: JSON.stringify({ modelId: "grok-web" }),
+        overrideState: JSON.stringify({ modelId: "claude-web" }),
         previousState: JSON.stringify({ type: "virtual_override" }),
         startsAt: new Date(Date.now() - 60_000),
         expiresAt: new Date(Date.now() - 1_000)
@@ -216,7 +216,7 @@ describe("providerRecoveryOverrideService", () => {
     await createRecoveryOverride({
       userId: other.userId,
       actionType: "mark_provider_temporarily_degraded",
-      provider: "grok",
+      provider: "claude",
       durationMinutes: 30,
       overrideState: { mode: "avoid_if_possible" }
     });
@@ -227,6 +227,6 @@ describe("providerRecoveryOverrideService", () => {
 
     const state = await getEffectiveRecoveryState(userId);
     expect(state.degradedProviders.gemini.mode).toBe("block_for_duration");
-    expect(state.degradedProviders.grok).toBeUndefined();
+    expect(state.degradedProviders.claude).toBeUndefined();
   });
 });

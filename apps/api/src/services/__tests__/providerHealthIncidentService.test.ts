@@ -110,8 +110,8 @@ describe("providerHealthIncidentService", () => {
 
   it("should resolve incident manually without fixing health", async () => {
     const health: ProviderHealth = {
-      provider: "grok",
-      displayName: "Grok",
+      provider: "claude",
+      displayName: "Claude",
       readiness: "ready",
       capabilities: ["send_message"],
       connectionStatus: "requires_login",

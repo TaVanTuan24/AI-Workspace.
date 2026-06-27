@@ -19,7 +19,7 @@ export class SafeError extends Error {
 
 export function toSafeProviderError(error: unknown, provider: ProviderId = "gemini"): SafeProviderError {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  const displayName = provider === "chatgpt" ? "ChatGPT" : provider === "grok" ? "Grok" : "Gemini";
+  const displayName = provider === "chatgpt" ? "ChatGPT" : provider === "claude" ? "Claude" : "Gemini";
 
   if (message.includes("UNKNOWN_PROVIDER")) {
     return { errorCode: "UNKNOWN_PROVIDER", message: "Unknown provider." };

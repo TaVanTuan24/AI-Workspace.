@@ -93,7 +93,7 @@ const buildApp = () => {
   return app;
 };
 
-function providerLimitError(provider: "chatgpt" | "grok" | "gemini", limit: number) {
+function providerLimitError(provider: "chatgpt" | "claude" | "gemini", limit: number) {
   return new ProviderRateLimitExceededError({
     allowed: false,
     provider,
@@ -139,13 +139,13 @@ describe("internal chat provider-limit usage logging", () => {
   it("logs /chat/multi provider-limit hits as internal_multi_chat", async () => {
     vi.mocked(checkProviderRateLimit)
       .mockRejectedValueOnce(providerLimitError("chatgpt", 20))
-      .mockRejectedValueOnce(providerLimitError("grok", 10));
+      .mockRejectedValueOnce(providerLimitError("claude", 10));
 
     const response = await buildApp().inject({
       method: "POST",
       url: "/chat/multi",
       payload: {
-        providers: ["chatgpt", "grok"],
+        providers: ["chatgpt", "claude"],
         prompt: "do not log me",
         saveHistory: false
       }
@@ -158,7 +158,7 @@ describe("internal chat provider-limit usage logging", () => {
       limitPerMinute: 20
     }));
     expect(logProviderRateLimitHit).toHaveBeenCalledWith(expect.objectContaining({
-      provider: "grok",
+      provider: "claude",
       source: "internal_multi_chat",
       limitPerMinute: 10
     }));

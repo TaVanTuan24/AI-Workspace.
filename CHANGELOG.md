@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Providers
+
+- Replaced the Grok web provider adapter with a Claude (claude.ai) web provider adapter. Supported providers are now ChatGPT, Gemini, and Claude.
+- Renamed the `PROVIDER_RATE_LIMIT_GROK_PER_MINUTE` environment variable to `PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE` and the `grok-web` OpenAI-compatible model id to `claude-web`.
+
 ## 0.3.0 - 2026-06-23
 
 Please see the [Release Notes for 0.3.0](docs/RELEASE_NOTES_0.3.0.md) for full details on Workspace Governance & Admin Observability.

@@ -39,7 +39,7 @@ const triggerOptions = [
   "no_usable_models"
 ];
 
-const providerOptions = ["chatgpt", "gemini", "grok"];
+const providerOptions = ["chatgpt", "gemini", "claude"];
 const severityOptions = ["info", "warning", "error", "critical"];
 const statusOptions = ["open", "requires_login", "manual_action_required", "expired", "error", "ui_changed", "no_usable_models"];
 

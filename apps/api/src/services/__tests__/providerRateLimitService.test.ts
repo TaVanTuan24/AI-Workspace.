@@ -32,7 +32,7 @@ describe("providerRateLimitService", () => {
     env.PROVIDER_RATE_LIMIT_MAX_PER_MINUTE = 300;
     env.PROVIDER_RATE_LIMIT_CHATGPT_PER_MINUTE = 20;
     env.PROVIDER_RATE_LIMIT_GEMINI_PER_MINUTE = 30;
-    env.PROVIDER_RATE_LIMIT_GROK_PER_MINUTE = 10;
+    env.PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE = 10;
   });
 
   it("returns env defaults and custom overrides without secrets", async () => {
@@ -41,7 +41,7 @@ describe("providerRateLimitService", () => {
         id: "limit-1",
         userId: "user-1",
         workspaceId: "ws-1",
-        provider: "grok",
+        provider: "claude",
         requestsPerMinute: 5,
         enabled: true,
         createdAt: new Date(),
@@ -60,7 +60,7 @@ describe("providerRateLimitService", () => {
       enabled: true
     });
     expect(result.limits).toContainEqual({
-      provider: "grok",
+      provider: "claude",
       requestsPerMinute: 5,
       effectiveRequestsPerMinute: 5,
       source: "custom",
@@ -95,7 +95,7 @@ describe("providerRateLimitService", () => {
       id: "limit-1",
       userId: "user-1",
       workspaceId: "ws-1",
-      provider: "grok",
+      provider: "claude",
       requestsPerMinute: 1,
       enabled: true,
       createdAt: new Date(),
@@ -103,7 +103,7 @@ describe("providerRateLimitService", () => {
     });
     vi.mocked(chatQueueConnection.incr).mockResolvedValueOnce(2);
 
-    await expect(checkProviderRateLimit("user-1", "grok")).rejects.toBeInstanceOf(
+    await expect(checkProviderRateLimit("user-1", "claude")).rejects.toBeInstanceOf(
       ProviderRateLimitExceededError
     );
   });

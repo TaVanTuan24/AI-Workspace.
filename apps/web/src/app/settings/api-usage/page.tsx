@@ -16,7 +16,7 @@ import {
 const providerLabels: Record<string, string> = {
   chatgpt: "ChatGPT",
   gemini: "Gemini",
-  grok: "Grok"
+  claude: "Claude"
 };
 
 const sourceLabels: Record<string, string> = {

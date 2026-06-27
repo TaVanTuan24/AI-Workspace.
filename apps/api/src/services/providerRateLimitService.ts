@@ -36,7 +36,7 @@ export class ProviderRateLimitExceededError extends Error {
 export function getProviderEnvDefault(provider: ProviderId): number {
   if (provider === "chatgpt") return env.PROVIDER_RATE_LIMIT_CHATGPT_PER_MINUTE;
   if (provider === "gemini") return env.PROVIDER_RATE_LIMIT_GEMINI_PER_MINUTE;
-  if (provider === "grok") return env.PROVIDER_RATE_LIMIT_GROK_PER_MINUTE;
+  if (provider === "claude") return env.PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE;
   return env.PROVIDER_RATE_LIMIT_DEFAULT_PER_MINUTE;
 }
 

@@ -9,7 +9,7 @@ import { linkNotificationEvents } from "./providerHealthIncidentService.js";
 const providerDisplayNames: Record<ProviderId, string> = {
   chatgpt: "ChatGPT",
   gemini: "Gemini",
-  grok: "Grok"
+  claude: "Claude"
 };
 
 export async function getWorkspaceNotifications(

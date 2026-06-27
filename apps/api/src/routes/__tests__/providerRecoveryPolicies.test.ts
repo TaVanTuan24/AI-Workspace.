@@ -320,9 +320,9 @@ describe("providerRecoveryPolicyRoutes", () => {
         userId: otherUserId,
         workspaceId: otherContext.workspaceId,
         actionType: "disable_model_temporarily",
-        modelId: "grok-web",
+        modelId: "claude-web",
         status: "active",
-        overrideState: JSON.stringify({ modelId: "grok-web" }),
+        overrideState: JSON.stringify({ modelId: "claude-web" }),
         previousState: JSON.stringify({ type: "virtual_override" }),
         startsAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000)

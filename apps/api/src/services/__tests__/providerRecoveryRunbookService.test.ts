@@ -36,7 +36,7 @@ describe("providerRecoveryRunbookService", () => {
   it("should build runbook for ui_changed", () => {
     const runbook = buildRunbook({
       userId: "u1",
-      provider: "grok",
+      provider: "claude",
       status: "ui_changed",
       incidentId: "inc3"
     });

@@ -1,4 +1,4 @@
-export const PROVIDERS = ["chatgpt", "grok", "gemini"];
+export const PROVIDERS = ["chatgpt", "claude", "gemini"];
 export function isProviderId(value) {
     return PROVIDERS.includes(value);
 }

@@ -47,8 +47,8 @@ describe("parseCliArgs", () => {
     );
   });
 
-  it("rejects Grok send-message without --yes", () => {
-    expect(() => parseCliArgs(["--provider", "grok", "--mode", "send-message"])).toThrow(
+  it("rejects Claude send-message without --yes", () => {
+    expect(() => parseCliArgs(["--provider", "claude", "--mode", "send-message"])).toThrow(
       "SEND_MESSAGE_REQUIRES_YES"
     );
   });

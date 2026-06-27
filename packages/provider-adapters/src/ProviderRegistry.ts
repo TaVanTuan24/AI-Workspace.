@@ -6,7 +6,7 @@ import type {
 import type { ProviderAdapter } from "./ProviderAdapter.js";
 import { ChatGPTAdapter } from "./chatgpt/ChatGPTAdapter.js";
 import { GeminiAdapter } from "./gemini/GeminiAdapter.js";
-import { GrokAdapter } from "./grok/GrokAdapter.js";
+import { ClaudeAdapter } from "./claude/ClaudeAdapter.js";
 
 export interface RegisteredProvider {
   definition: ProviderDefinition;
@@ -65,7 +65,7 @@ export class ProviderRegistry {
 export function defaultProviders(): RegisteredProvider[] {
   const gemini = new GeminiAdapter();
   const chatgpt = new ChatGPTAdapter();
-  const grok = new GrokAdapter();
+  const claude = new ClaudeAdapter();
 
   return [
     {
@@ -102,18 +102,19 @@ export function defaultProviders(): RegisteredProvider[] {
     },
     {
       definition: {
-        id: "grok",
-        displayName: "Grok",
-        loginUrl: grok.loginUrl,
+        id: "claude",
+        displayName: "Claude",
+        loginUrl: claude.loginUrl,
         capabilities: ["connect", "validate_session", "send_message", "pseudo_stream", "multi_provider"],
         readiness: "ready",
         defaultEnabled: true,
         subModels: [
           { id: "current", label: "Current / Provider default", available: true },
-          { id: "reasoning", label: "Reasoning variant if available", available: "detect" }
+          { id: "opus", label: "Opus if available", available: "detect" },
+          { id: "sonnet", label: "Sonnet if available", available: "detect" }
         ]
       },
-      adapter: grok
+      adapter: claude
     }
   ];
 }

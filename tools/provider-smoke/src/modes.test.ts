@@ -28,10 +28,10 @@ describe("detectUiMode", () => {
     expect(result.checks).toContainEqual({ name: "ui_note", status: "warn", message: "No assistant message yet." });
   });
 
-  it("supports Grok inspectUi through the same provider-agnostic path", async () => {
+  it("supports Claude inspectUi through the same provider-agnostic path", async () => {
     const adapter = {
-      providerId: "grok",
-      loginUrl: "https://grok.com",
+      providerId: "claude",
+      loginUrl: "https://claude.ai",
       inspectUi: async () => ({
         composerFound: true,
         sendButtonFound: false,
@@ -41,7 +41,7 @@ describe("detectUiMode", () => {
     } as unknown as ProviderAdapter;
 
     const result = await detectUiMode({
-      provider: "grok",
+      provider: "claude",
       adapter,
       context: {} as BrowserContext
     });

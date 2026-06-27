@@ -7,7 +7,7 @@ vi.mock("../providerHealthService.js", () => ({
   getProviderHealth: vi.fn().mockResolvedValue([
     { provider: "chatgpt", isUsable: false, healthStatus: "error" },
     { provider: "gemini", isUsable: true, healthStatus: "healthy" },
-    { provider: "grok", isUsable: true, healthStatus: "healthy" }
+    { provider: "claude", isUsable: true, healthStatus: "healthy" }
   ]),
   refreshProviderHealth: vi.fn().mockResolvedValue({ provider: "chatgpt", isUsable: false }),
   runUiDiagnostics: vi.fn().mockResolvedValue({
@@ -283,7 +283,7 @@ describe("providerRecoveryPolicyService", () => {
         {
           type: "prefer_fallback_provider",
           enabled: true,
-          config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "grok"] }
+          config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "claude"] }
         },
         {
           type: "disable_model_temporarily",
@@ -313,7 +313,7 @@ describe("providerRecoveryPolicyService", () => {
     vi.mocked(getProviderHealth).mockResolvedValueOnce([
       { provider: "chatgpt", isUsable: false, healthStatus: "error" },
       { provider: "gemini", isUsable: false, healthStatus: "requires_login" },
-      { provider: "grok", isUsable: false, healthStatus: "requires_login" }
+      { provider: "claude", isUsable: false, healthStatus: "requires_login" }
     ] as any);
     await createProviderRecoveryPolicy(userId, {
       name: "No fallback",
@@ -322,7 +322,7 @@ describe("providerRecoveryPolicyService", () => {
       actions: [{
         type: "prefer_fallback_provider",
         enabled: true,
-        config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "grok"] }
+        config: { durationMinutes: 60, onlyIfProvider: "chatgpt", fallbackProviderOrder: ["gemini", "claude"] }
       }]
     });
 

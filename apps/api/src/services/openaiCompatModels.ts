@@ -9,9 +9,9 @@ export const OPENAI_COMPAT_MODELS: Record<string, { provider: ProviderId; displa
     provider: "chatgpt",
     displayName: "ChatGPT Web"
   },
-  "grok-web": {
-    provider: "grok",
-    displayName: "Grok Web"
+  "claude-web": {
+    provider: "claude",
+    displayName: "Claude Web"
   }
 };
 

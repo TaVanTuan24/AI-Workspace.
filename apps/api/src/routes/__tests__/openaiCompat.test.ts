@@ -43,10 +43,10 @@ describe("OpenAI Compat Errors", () => {
 });
 
 describe("OpenAI Compat Models", () => {
-  it("includes gemini, chatgpt, grok wrappers", () => {
+  it("includes gemini, chatgpt, claude wrappers", () => {
     expect(OPENAI_COMPAT_MODELS["gemini-web"]).toBeDefined();
     expect(OPENAI_COMPAT_MODELS["chatgpt-web"]).toBeDefined();
-    expect(OPENAI_COMPAT_MODELS["grok-web"]).toBeDefined();
+    expect(OPENAI_COMPAT_MODELS["claude-web"]).toBeDefined();
   });
 });
 

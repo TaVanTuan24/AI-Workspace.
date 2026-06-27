@@ -1,4 +1,4 @@
-export declare const PROVIDERS: readonly ["chatgpt", "grok", "gemini"];
+export declare const PROVIDERS: readonly ["chatgpt", "claude", "gemini"];
 export type ProviderId = (typeof PROVIDERS)[number];
 export type ProviderStatus = "not_connected" | "connecting" | "connected" | "requires_login" | "manual_action_required" | "expired" | "error" | "disconnected";
 export type ProviderAuthStatus = "connected" | "requires_login" | "manual_action_required" | "expired" | "error";

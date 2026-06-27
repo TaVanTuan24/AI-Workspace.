@@ -215,7 +215,7 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
 
   /**
    * Navigate to the provider entry point. The default loads `loginUrl`;
-   * providers with bespoke navigation (e.g. Grok / Cloudflare) override this.
+   * providers with bespoke navigation (e.g. Cloudflare challenges) override this.
    */
   protected async navigate(page: Page): Promise<void> {
     await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});

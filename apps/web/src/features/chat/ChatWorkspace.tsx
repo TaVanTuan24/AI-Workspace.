@@ -49,7 +49,7 @@ export function ChatWorkspace() {
   const sourcesRef = useRef<Map<string, EventSource>>(new Map());
   const [mode, setMode] = useState<Mode>("single");
   const [selectedSingle, setSelectedSingle] = useState<ProviderId>("gemini");
-  const [selectedCompare, setSelectedCompare] = useState<ProviderId[]>(["gemini", "chatgpt", "grok"]);
+  const [selectedCompare, setSelectedCompare] = useState<ProviderId[]>(["gemini", "chatgpt", "claude"]);
   const [prompt, setPrompt] = useState("");
   const [saveHistory, setSaveHistory] = useState(true);
   const [cards, setCards] = useState<Record<string, ResponseCardState>>({});
@@ -706,7 +706,7 @@ function StreamingResponseCard({
 }
 
 function isProvider(value: string): value is ProviderId {
-  return value === "gemini" || value === "chatgpt" || value === "grok";
+  return value === "gemini" || value === "chatgpt" || value === "claude";
 }
 
 function initialCard(provider: ProviderId | string, definition?: ProviderConnectionSummary): ResponseCardState {
