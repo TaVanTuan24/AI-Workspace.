@@ -22,3 +22,28 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Build/release artifacts (produced by CI, not committed)
+dist-release/
+dist-security/
+var/*.log
+
+# Stray binaries accidentally extracted into the repo
+*.exe
+*.pdb
+*.dll
+*.zip
+*.rdb
+
+# Ad-hoc scratch & debug files
+scratch*.js
+temp_migration.sql
+apps/worker/*.png
+apps/worker/scripts/debug/
+
+# Misc accidental files
+/00-RELEASENOTES
+/README.txt
+/RELEASENOTES.txt
+/3.2.6
+/6.4.3
