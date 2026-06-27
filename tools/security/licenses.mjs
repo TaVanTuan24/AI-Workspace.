@@ -86,8 +86,14 @@ async function run() {
   try {
     rawOutput = execSync("corepack pnpm licenses list --json", { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" });
   } catch (err) {
-    console.error("Failed to run pnpm licenses list. Ensure you are in a pnpm workspace.");
-    process.exit(1);
+    // pnpm licenses list can exit non-zero (e.g. when some packages report an
+    // unknown license) while still emitting valid JSON on stdout. Recover that
+    // output; only treat it as a hard failure when nothing usable was produced.
+    rawOutput = (err.stdout ?? "").toString();
+    if (!rawOutput.trim()) {
+      console.error("Failed to run pnpm licenses list:", (err.stderr ?? "").toString() || err.message);
+      process.exit(1);
+    }
   }
 
   let licensesData;
