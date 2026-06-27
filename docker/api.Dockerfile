@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/playwright:v1.45.1-jammy
 
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g pnpm@9.5.0
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
