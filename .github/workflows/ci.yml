@@ -45,6 +45,9 @@ jobs:
       - name: Prisma validate
         run: pnpm exec prisma validate
 
+      - name: Prepare test database
+        run: pnpm exec prisma db push --skip-generate
+
       - name: Typecheck
         run: pnpm typecheck
 
