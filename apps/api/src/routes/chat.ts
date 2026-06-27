@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { OutgoingHttpHeaders } from "node:http";
 import { z } from "zod";
 import { isProviderId, type ChatJobPayload, type ErrorCode, type ProviderId } from "@uaiw/shared/types/provider.js";
 import { attachLocalUser } from "../middleware/auth.js";
@@ -309,17 +310,26 @@ provider: providerCheck.provider,
       });
     }
 
-    reply.raw.writeHead(200, {
+    // reply.getHeaders() can include numeric values (e.g. content-length) which
+    // TS rejects against the named keys of OutgoingHttpHeaders even though Node
+    // accepts them at runtime. Cast through unknown for this header plumbing.
+    const sseHeaders = {
+      ...reply.getHeaders(),
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no"
-    });
+    } as unknown as OutgoingHttpHeaders;
+    reply.raw.writeHead(200, sseHeaders);
 
     const send = (event: string, data: unknown) => {
       reply.raw.write(`event: ${event}\n`);
       reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
     };
+
+    const pingInterval = setInterval(() => {
+      send("ping", { timestamp: Date.now() });
+    }, 5000);
 
     let unsubscribe: (() => Promise<void>) | undefined;
     unsubscribe = await redisEvents.subscribe(jobId, (event) => {
@@ -333,12 +343,14 @@ provider: providerCheck.provider,
         event.type === "cancelled" ||
         event.type === "timeout"
       ) {
+        clearInterval(pingInterval);
         void unsubscribe?.();
         reply.raw.end();
       }
     });
 
     request.raw.on("close", () => {
+      clearInterval(pingInterval);
       void unsubscribe?.();
     });
 

@@ -1,39 +1,57 @@
-import type { BrowserContext, Locator, Page } from "playwright";
-import type { PromptInput, ProviderAuthStatus, ProviderEvent, ProviderUiDiagnosis } from "@uaiw/shared/types/provider.js";
-import { BaseProviderAdapter, type ProviderUiInspection } from "../ProviderAdapter.js";
-import { runSafeDomDiagnostics } from "../diagnostics/safeDomDiagnostics.js";
-import { detectModelOptionsFromPage } from "../diagnostics/liveSubModelDetection.js";
-import type { LiveSubModelDetectionResult } from "@uaiw/shared/types/provider.js";
+import type { BrowserContext, Page } from "playwright";
+import type { PromptInput, ProviderAuthStatus, ProviderEvent } from "@uaiw/shared/types/provider.js";
+import {
+  BaseProviderAdapter,
+  type ProviderSelectors,
+  NAVIGATION_TIMEOUT_MS,
+  COMPOSER_TIMEOUT_MS,
+  RESPONSE_TOTAL_TIMEOUT_MS,
+  RESPONSE_IDLE_TIMEOUT_MS,
+  RESPONSE_POLL_INTERVAL_MS
+} from "../ProviderAdapter.js";
 import { GROK_SELECTORS, GROK_URLS } from "./selectors.js";
-
-const NAVIGATION_TIMEOUT_MS = 45_000;
-const COMPOSER_TIMEOUT_MS = 15_000;
-const RESPONSE_TOTAL_TIMEOUT_MS = 120_000;
-const RESPONSE_IDLE_TIMEOUT_MS = 4_500;
-const RESPONSE_POLL_INTERVAL_MS = 750;
 
 export class GrokAdapter extends BaseProviderAdapter {
   providerId = "grok" as const;
   loginUrl = GROK_URLS.primaryLoginUrl;
+  protected readonly selectors: ProviderSelectors = GROK_SELECTORS;
+  protected readonly providerLabel = "Grok";
+  protected readonly modelPickerCandidates = [
+    `button[aria-haspopup="menu"]:has-text("Grok")`,
+    `button[aria-label*="model" i]`,
+    `div[role="button"]:has-text("Grok")`
+  ];
+
+  protected isLikelyChromeText(text: string): boolean {
+    return /home|explore|notifications|messages|premium|subscribe|what's happening|who to follow/i.test(text) && text.length < 280;
+  }
+
+  /** Grok navigates through x.com/grok.com with Cloudflare fallbacks. */
+  protected async navigate(page: Page): Promise<void> {
+    await this.navigateToGrok(page);
+  }
 
   async detectLoggedIn(context: BrowserContext): Promise<ProviderAuthStatus> {
     const page = await this.firstPage(context);
     await this.navigateToGrok(page);
+
+    // Wait for Cloudflare challenge to auto-resolve before checking anything
+    await this.waitForCloudflare(page);
 
     const url = page.url();
     if (/x\.com\/login|x\.com\/i\/flow\/login|grok\.com\/login|signin|sign-in/i.test(url)) {
       return "requires_login";
     }
 
-    if (await this.firstVisible(page, GROK_SELECTORS.composerCandidates, 5000)) {
-      return "connected";
-    }
-
-    if (await this.firstVisible(page, GROK_SELECTORS.loginIndicators, 1000)) {
+    if (await this.firstVisible(page, this.selectors.loginIndicators ?? [], 2000)) {
       return "requires_login";
     }
 
-    if (await this.firstVisible(page, GROK_SELECTORS.manualActionIndicators, 1000)) {
+    if (await this.firstVisible(page, this.selectors.composerCandidates, COMPOSER_TIMEOUT_MS)) {
+      return "connected";
+    }
+
+    if (await this.firstVisible(page, this.selectors.manualActionIndicators ?? [], 2000)) {
       return "manual_action_required";
     }
 
@@ -41,33 +59,33 @@ export class GrokAdapter extends BaseProviderAdapter {
   }
 
   async validateSession(context: BrowserContext): Promise<ProviderAuthStatus> {
-    return this.detectLoggedIn(context);
-  }
+    // Grok uses Cloudflare Turnstile which blocks all automated browsers.
+    // Instead of loading the page (which triggers Cloudflare), validate by
+    // checking that the authentication cookies exist and are not expired.
+    // The browser-based detectLoggedIn is only used during the connect flow
+    // where the user can manually solve Cloudflare in the popup.
+    try {
+      const cookies = await context.cookies("https://grok.com");
+      const ssoCookie = cookies.find(c => c.name === "sso" || c.name === "sso-rw");
+      const userIdCookie = cookies.find(c => c.name === "x-userid");
 
-  async inspectUi(context: BrowserContext): Promise<ProviderUiInspection> {
-    const page = await this.firstPage(context);
-    await this.navigateToGrok(page);
+      if (!ssoCookie && !userIdCookie) {
+        return "requires_login";
+      }
 
-    const composerFound = await this.firstVisible(page, GROK_SELECTORS.composerCandidates, 5000);
-    const sendButtonFound = await this.firstVisible(page, GROK_SELECTORS.sendButtonCandidates, 1500);
-    const responseContainerFound = await this.firstVisible(page, GROK_SELECTORS.responseCandidates, 1500);
-    const stopButtonFound = await this.firstVisible(page, GROK_SELECTORS.stopButtonCandidates, 500);
+      // Check if cookies are expired
+      const now = Date.now() / 1000;
+      for (const cookie of [ssoCookie, userIdCookie].filter(Boolean)) {
+        if (cookie!.expires > 0 && cookie!.expires < now) {
+          return "expired";
+        }
+      }
 
-    return {
-      composerFound,
-      sendButtonFound,
-      responseContainerFound,
-      stopButtonFound: stopButtonFound || undefined,
-      notes: composerFound ? [] : ["Grok composer was not visible."]
-    };
-  }
-
-  async exportSession(context: BrowserContext): Promise<unknown> {
-    return context.storageState();
-  }
-
-  async importSession(_context: BrowserContext, _sessionState: unknown): Promise<void> {
-    // Storage state is supplied when the browser context is created.
+      return "connected";
+    } catch {
+      // If we can't read cookies, fall back to page-based detection
+      return this.detectLoggedIn(context);
+    }
   }
 
   async *sendMessage(
@@ -76,14 +94,28 @@ export class GrokAdapter extends BaseProviderAdapter {
   ): AsyncIterable<ProviderEvent> {
     const page = await this.firstPage(context);
     await this.navigateToGrok(page);
+    await this.waitForCloudflare(page);
 
-    const status = await this.detectLoggedIn(context);
+    // Use cookie-based validation to avoid re-triggering Cloudflare
+    const status = await this.validateSession(context);
     if (status !== "connected") {
       yield {
         type: status === "manual_action_required" ? "manual_action_required" : "requires_login",
         provider: this.providerId,
         jobId: input.jobId,
         message: "Please complete Grok login or verification in the browser window."
+      };
+      return;
+    }
+
+    // After Cloudflare wait, check if the page actually loaded the Grok UI
+    if (await this.isCloudflareChallenge(page)) {
+      yield {
+        type: "error",
+        provider: this.providerId,
+        jobId: input.jobId,
+        errorCode: "CLOUDFLARE_BLOCKED",
+        message: "Grok is blocked by Cloudflare security verification. Please reconnect Grok to refresh the session."
       };
       return;
     }
@@ -98,8 +130,8 @@ export class GrokAdapter extends BaseProviderAdapter {
       return;
     }
 
-    const composer = this.composerLocator(page);
-    if (!(await composer.isVisible({ timeout: COMPOSER_TIMEOUT_MS }).catch(() => false))) {
+    const composer = await this.getVisibleComposer(page);
+    if (!composer) {
       yield {
         type: "error",
         provider: this.providerId,
@@ -136,7 +168,7 @@ export class GrokAdapter extends BaseProviderAdapter {
         return;
       }
 
-      if (await this.firstVisible(page, GROK_SELECTORS.manualActionIndicators, 250)) {
+      if (await this.firstVisible(page, this.selectors.manualActionIndicators ?? [], 250)) {
         yield {
           type: "manual_action_required",
           provider: this.providerId,
@@ -171,8 +203,8 @@ export class GrokAdapter extends BaseProviderAdapter {
         }
       }
 
-      const stopVisible = await this.firstVisible(page, GROK_SELECTORS.stopButtonCandidates, 250);
-      const sendVisible = await this.firstVisible(page, GROK_SELECTORS.sendButtonCandidates, 250);
+      const stopVisible = await this.firstVisible(page, this.selectors.stopButtonCandidates, 250);
+      const sendVisible = await this.firstVisible(page, this.selectors.sendButtonCandidates, 250);
       if (lastText && !stopVisible && sendVisible && Date.now() - lastChangeAt >= RESPONSE_IDLE_TIMEOUT_MS) {
         yield {
           type: "message_complete",
@@ -213,187 +245,62 @@ export class GrokAdapter extends BaseProviderAdapter {
     };
   }
 
-  async newChat(context: BrowserContext): Promise<void> {
-    const page = await this.firstPage(context);
-    await this.navigateToGrok(page);
+  // --- Grok-specific navigation / Cloudflare handling ----------------------
+
+  private async waitForCloudflare(page: Page): Promise<void> {
+    const CLOUDFLARE_TIMEOUT_MS = 30_000;
+    const POLL_INTERVAL_MS = 1_500;
+    const start = Date.now();
+
+    while (Date.now() - start < CLOUDFLARE_TIMEOUT_MS) {
+      const isCloudflare = await this.isCloudflareChallenge(page);
+      if (!isCloudflare) return;
+
+      // Still on Cloudflare — wait and retry
+      await page.waitForTimeout(POLL_INTERVAL_MS).catch(() => {});
+    }
+    // Timed out waiting for Cloudflare — proceed anyway, detectLoggedIn will handle the result
   }
 
-  async stopGeneration(context: BrowserContext): Promise<void> {
-    const page = await this.firstPage(context);
-    for (const selector of GROK_SELECTORS.stopButtonCandidates) {
-      const button = page.locator(selector).first();
-      if (await button.isVisible({ timeout: 500 }).catch(() => false)) {
-        await button.click({ timeout: 1000 }).catch(() => {});
-        return;
+  private async isCloudflareChallenge(page: Page): Promise<boolean> {
+    try {
+      const frames = page.frames();
+      const hasCfFrame = frames.some(f => f.url().includes("challenges.cloudflare.com"));
+      if (hasCfFrame) return true;
+
+      const bodyText = await page.locator("body").innerText({ timeout: 2000 }).catch(() => "");
+      if (/Performing security verification|Verify you are human|Checking if the site connection is secure/i.test(bodyText)) {
+        return true;
       }
+
+      return false;
+    } catch {
+      return false;
     }
   }
 
   private async navigateToGrok(page: Page): Promise<void> {
-    await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+    let url = page.url();
+    if (!url.includes("grok.com") && !/x\.com\/login|x\.com\/i\/flow\/login|signin|sign-in/i.test(url)) {
+      await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
+    }
 
-    if (await this.firstVisible(page, GROK_SELECTORS.composerCandidates, 1000)) return;
-    if (await this.firstVisible(page, GROK_SELECTORS.loginIndicators, 500)) return;
-    if (await this.firstVisible(page, GROK_SELECTORS.manualActionIndicators, 500)) return;
+    url = page.url();
+    if (/x\.com\/login|x\.com\/i\/flow\/login|grok\.com\/login|signin|sign-in/i.test(url)) {
+      return;
+    }
+
+    if (await this.firstVisible(page, this.selectors.loginIndicators ?? [], 1000)) return;
+    if (await this.firstVisible(page, this.selectors.composerCandidates, 500)) return;
+    if (await this.firstVisible(page, this.selectors.manualActionIndicators ?? [], 500)) return;
 
     for (const fallbackUrl of GROK_URLS.fallbackLoginUrls) {
       await page.goto(fallbackUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});
       await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
-      if (await this.firstVisible(page, GROK_SELECTORS.composerCandidates, 1000)) return;
-      if (await this.firstVisible(page, GROK_SELECTORS.loginIndicators, 500)) return;
-      if (await this.firstVisible(page, GROK_SELECTORS.manualActionIndicators, 500)) return;
-    }
-  }
-
-  private composerLocator(page: Page) {
-    return page.locator(GROK_SELECTORS.composerCandidates.join(", ")).first();
-  }
-
-  private async fillComposer(page: Page, composer: Locator, prompt: string): Promise<void> {
-    await composer.click({ timeout: 5000 });
-    await composer.fill(prompt).catch(async () => {
-      await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-      await page.keyboard.insertText(prompt);
-    });
-  }
-
-  private async clickSend(page: Page): Promise<boolean> {
-    for (const selector of GROK_SELECTORS.sendButtonCandidates) {
-      const button = page.locator(selector).last();
-      if (await button.isVisible({ timeout: 1000 }).catch(() => false)) {
-        const disabled = await button.isDisabled({ timeout: 250 }).catch(() => false);
-        if (!disabled) {
-          await button.click({ timeout: 3000 }).catch(() => {});
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  private async latestResponseText(page: Page): Promise<string> {
-    for (const selector of GROK_SELECTORS.responseCandidates) {
-      const locator = page.locator(selector);
-      const count = await locator.count().catch(() => 0);
-      for (let index = count - 1; index >= 0; index -= 1) {
-        const candidate = locator.nth(index);
-        if (!(await candidate.isVisible({ timeout: 250 }).catch(() => false))) continue;
-        const text = this.normalizeResponseText((await candidate.innerText().catch(() => "")) ?? "");
-        if (text && !this.isLikelyChromeText(text)) {
-          return text;
-        }
-      }
-    }
-
-    return "";
-  }
-
-  private async detectRateLimit(page: Page): Promise<boolean> {
-    return this.firstVisible(page, GROK_SELECTORS.rateLimitIndicators, 250);
-  }
-
-  private async firstVisible(page: Page, selectors: readonly string[], timeoutMs: number): Promise<boolean> {
-    for (const selector of selectors) {
-      const locator = page.locator(selector).first();
-      if (await locator.isVisible({ timeout: timeoutMs }).catch(() => false)) return true;
-    }
-    return false;
-  }
-
-  private normalizeResponseText(text: string): string {
-    return text
-      .replace(/\r/g, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-  }
-
-  private isLikelyChromeText(text: string): boolean {
-    return /home|explore|notifications|messages|premium|subscribe|what's happening|who to follow/i.test(text) && text.length < 280;
-  }
-
-  async diagnoseUi(context: BrowserContext): Promise<ProviderUiDiagnosis> {
-    const page = await context.newPage();
-    try {
-      await this.navigateToGrok(page);
-      const authStatus = await this.detectLoggedIn(context);
-      
-      if (authStatus === "requires_login") {
-        return { provider: this.providerId, url: page.url(), status: "requires_login", checkedAt: new Date().toISOString(), candidates: [], missingKinds: [], warnings: ["Login required. Cannot diagnose chat UI."] };
-      }
-      if (authStatus === "manual_action_required") {
-        return { provider: this.providerId, url: page.url(), status: "manual_action_required", checkedAt: new Date().toISOString(), candidates: [], missingKinds: [], warnings: ["Manual action required. Cannot diagnose chat UI."] };
-      }
-
-      await page.waitForTimeout(2000);
-      return await runSafeDomDiagnostics(page, this.providerId);
-    } catch (err: any) {
-      return { provider: this.providerId, url: page.url(), status: "error", checkedAt: new Date().toISOString(), candidates: [], missingKinds: [], warnings: [err.message] };
-    } finally {
-      await page.close().catch(() => {});
-    }
-  }
-
-  async detectLiveSubModels(context: BrowserContext): Promise<LiveSubModelDetectionResult> {
-    const page = await context.newPage();
-    try {
-      await this.navigateToGrok(page);
-      const authStatus = await this.detectLoggedIn(context);
-
-      if (authStatus === "requires_login") {
-        return { provider: this.providerId, status: "requires_login", detectedAt: new Date().toISOString(), subModels: [], warnings: [] };
-      }
-      if (authStatus === "manual_action_required") {
-        return { provider: this.providerId, status: "manual_action_required", detectedAt: new Date().toISOString(), subModels: [], warnings: [] };
-      }
-
-      await page.waitForTimeout(2000);
-
-      const pickerCandidates = [
-        `button[aria-haspopup="menu"]:has-text("Grok")`,
-        `button[aria-label*="model" i]`,
-        `div[role="button"]:has-text("Grok")`
-      ];
-
-      let clicked = false;
-      for (const sel of pickerCandidates) {
-        const btn = page.locator(sel).first();
-        if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await btn.click({ timeout: 1000 }).catch(() => {});
-          await page.waitForTimeout(1000);
-          clicked = true;
-          break;
-        }
-      }
-
-      const subModels = await detectModelOptionsFromPage(page, this.providerId);
-
-      if (clicked) {
-        await page.keyboard.press("Escape").catch(() => {});
-      }
-
-      if (subModels.length === 0) {
-         return {
-           provider: this.providerId,
-           status: "ui_changed",
-           detectedAt: new Date().toISOString(),
-           subModels: [],
-           warnings: ["No sub-models detected. UI may have changed."]
-         };
-      }
-
-      return {
-        provider: this.providerId,
-        status: "ok",
-        detectedAt: new Date().toISOString(),
-        subModels,
-        warnings: []
-      };
-    } catch (err: any) {
-      return { provider: this.providerId, status: "error", errorCode: "UNKNOWN_SAFE_ERROR", detectedAt: new Date().toISOString(), subModels: [], warnings: [err.message] };
-    } finally {
-      await page.close().catch(() => {});
+      if (await this.firstVisible(page, this.selectors.loginIndicators ?? [], 1000)) return;
+      if (await this.firstVisible(page, this.selectors.composerCandidates, 500)) return;
+      if (await this.firstVisible(page, this.selectors.manualActionIndicators ?? [], 500)) return;
     }
   }
 }

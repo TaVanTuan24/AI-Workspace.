@@ -3,6 +3,7 @@ import { exportAllConversations, exportThread } from "../services/conversationEx
 import { previewConversationImport, importConversations } from "../services/conversationImportService.js";
 import { encryptConversationExport, decryptConversationBackup } from "../services/encryptedBackupService.js";
 import { z } from "zod";
+import { attachLocalUser } from "../middleware/auth.js";
 
 const ImportRequestSchema = z.object({
   file: z.unknown(),
@@ -30,6 +31,7 @@ const EncryptedImportRequestSchema = z.object({
 });
 
 export const conversationsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook("preHandler", attachLocalUser);
   // Enforce auth manually for these endpoints, or trust the hook in server.ts
   // Assuming the `addHook('preHandler', fastify.authenticate)` is applied globally to /settings routes in server.ts.
   

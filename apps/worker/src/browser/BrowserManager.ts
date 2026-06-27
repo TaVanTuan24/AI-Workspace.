@@ -14,10 +14,19 @@ export class BrowserManager {
 
     this.browser = await chromium.launch({
       headless: env.BROWSER_HEADLESS,
-      args: ["--disable-dev-shm-usage"]
+      args: ["--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+      ignoreDefaultArgs: ["--enable-automation"]
     });
 
     return this.browser;
+  }
+
+  private async getNonHeadlessUserAgent(browser: Browser): Promise<string> {
+    const dummyContext = await browser.newContext();
+    const dummyPage = await dummyContext.newPage();
+    const ua = await dummyPage.evaluate(() => navigator.userAgent);
+    await dummyContext.close();
+    return ua.replace("HeadlessChrome", "Chrome");
   }
 
   async createContextForUserProvider(input: {
@@ -29,11 +38,15 @@ export class BrowserManager {
     const profileDir = path.join(env.BROWSER_PROFILE_ROOT, input.userId, input.provider);
     await mkdir(profileDir, { recursive: true });
 
-    return browser.newContext({
+    const userAgent = await this.getNonHeadlessUserAgent(browser);
+    const context = await browser.newContext({
       storageState: input.storageState as never,
       viewport: { width: 1365, height: 900 },
+      userAgent,
       recordVideo: undefined
     });
+
+    return context;
   }
 
   async closeContext(context: BrowserContext): Promise<void> {

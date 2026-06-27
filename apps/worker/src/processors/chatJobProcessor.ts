@@ -104,7 +104,7 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
         await prisma.providerConnection.update({
           where: { id: connection.id },
           data: {
-            status: authStatus === "expired" ? "expired" : "requires_login",
+            status: authStatus,
             lastValidatedAt: new Date()
           }
         });
@@ -221,7 +221,9 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
       await publisher.complete(input.jobId, input.provider);
     } finally {
       if (await isJobCancelled(input.jobId).catch(() => false)) {
-        await registered.adapter.stopGeneration(context).catch(() => {});
+        await registered.adapter
+          .stopGeneration(context)
+          .catch((err) => console.warn("stopGeneration failed during cleanup", { jobId: input.jobId, err }));
       }
       await browserManager.closeContext(context);
     }
@@ -269,7 +271,7 @@ async function failJob(input: ChatJobPayload, errorCode: ErrorCode, message: str
       errorCode,
       errorMessageSafe: message
     }
-  }).catch(() => {});
+  }).catch((err) => console.error("Failed to persist failed job status", { jobId: input.jobId, err }));
 
   await publisher.publish(input.jobId, {
     type: "error",
@@ -290,7 +292,7 @@ async function markManualActionRequired(input: ChatJobPayload, message: string):
       errorCode: "MANUAL_ACTION_REQUIRED",
       errorMessageSafe: message
     }
-  }).catch(() => {});
+  }).catch((err) => console.error("Failed to persist manual_action_required job status", { jobId: input.jobId, err }));
 
   await publisher.publish(input.jobId, {
     type: "manual_action_required",
@@ -310,7 +312,7 @@ async function markRateLimited(input: ChatJobPayload, message: string): Promise<
       errorCode: "PROVIDER_RATE_LIMITED",
       errorMessageSafe: message
     }
-  }).catch(() => {});
+  }).catch((err) => console.error("Failed to persist rate_limited job status", { jobId: input.jobId, err }));
 
   await publisher.publish(input.jobId, {
     type: "rate_limited",
@@ -330,7 +332,7 @@ async function cancelJob(input: ChatJobPayload): Promise<void> {
       errorCode: "JOB_CANCELLED",
       errorMessageSafe: "Job was cancelled."
     }
-  }).catch(() => {});
+  }).catch((err) => console.error("Failed to persist cancelled job status", { jobId: input.jobId, err }));
 
   await publisher.publish(input.jobId, {
     type: "cancelled",
@@ -351,7 +353,7 @@ async function timeoutJob(input: ChatJobPayload): Promise<void> {
       errorCode: "JOB_TIMEOUT",
       errorMessageSafe: message
     }
-  }).catch(() => {});
+  }).catch((err) => console.error("Failed to persist timeout job status", { jobId: input.jobId, err }));
 
   await publisher.publish(input.jobId, {
     type: "timeout",

@@ -10,7 +10,10 @@ import {
 
 const VALID_RANGES = ["24h", "7d", "30d", "90d"] as const;
 
+import { attachLocalUser } from "../middleware/auth.js";
+
 export async function workspaceActivityRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", attachLocalUser);
   app.get("/settings/workspace/activity", async (request, reply) => {
     if (!(await requirePermission(request, reply, "settings.read"))) return;
 

@@ -7,6 +7,12 @@ vi.mock("../../services/schedulerFleetStatusService.js", () => ({
   getSchedulerFleetStatus: vi.fn()
 }));
 
+vi.mock("../../middleware/auth.js", () => ({
+  attachLocalUser: async (request: any) => {
+    request.user = { id: "user-1", workspaceId: "ws-sched-test", role: "owner" };
+  }
+}));
+
 vi.mock("../../auth/requirePermission.js", () => ({
   requirePermission: vi.fn().mockResolvedValue(true)
 }));

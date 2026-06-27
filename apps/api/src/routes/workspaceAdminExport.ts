@@ -6,7 +6,10 @@ import type { ActivityRange } from "../services/workspaceActivityService.js";
 
 const VALID_RANGES = ["24h", "7d", "30d", "90d"] as const;
 
+import { attachLocalUser } from "../middleware/auth.js";
+
 export async function workspaceAdminExportRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", attachLocalUser);
   app.get("/settings/workspace/admin-export", async (request, reply) => {
     if (!(await requirePermission(request, reply, "settings.read"))) return;
 

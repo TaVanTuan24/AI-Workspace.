@@ -11,6 +11,12 @@ vi.mock("../../services/workspaceActivityService.js", () => ({
   ],
 }));
 
+vi.mock("../../middleware/auth.js", () => ({
+  attachLocalUser: async (request: any) => {
+    request.user = { id: "user-1", workspaceId: "ws-activity-test", role: "owner" };
+  }
+}));
+
 vi.mock("../../auth/requirePermission.js", () => ({
   requirePermission: vi.fn().mockResolvedValue(true)
 }));

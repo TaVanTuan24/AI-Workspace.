@@ -3,7 +3,10 @@ import { requirePermission } from "../auth/requirePermission.js";
 import { getWorkspaceContextForRequest } from "../auth/workspaceContext.js";
 import { getWorkspaceAdminOverview } from "../services/workspaceAdminOverviewService.js";
 
+import { attachLocalUser } from "../middleware/auth.js";
+
 export async function workspaceAdminOverviewRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", attachLocalUser);
   app.get("/settings/workspace/admin-overview", async (request, reply) => {
     if (!(await requirePermission(request, reply, "settings.read"))) return;
 

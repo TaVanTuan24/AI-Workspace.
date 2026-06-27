@@ -183,7 +183,7 @@ export async function providerRoutes(app: FastifyInstance) {
     const adapter = providerRegistry.get(provider).adapter;
 
     try {
-      const authStatus = await adapter.detectLoggedIn(runtime.context);
+      const authStatus = await adapter.validateSession(runtime.context);
       if (authStatus !== "connected") {
         await prisma.providerConnection.update({
           where: { userId_provider: { userId: request.user.id, provider } },
@@ -243,6 +243,7 @@ export async function providerRoutes(app: FastifyInstance) {
         manualActionRequired: false
       });
     } catch (error) {
+      console.error("connect/status error:", error);
       await browserManager.closeConnectSession(query.connectSessionId).catch(() => {});
       await prisma.providerConnection.update({
         where: { userId_provider: { userId: request.user.id, provider } },

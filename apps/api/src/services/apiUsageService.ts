@@ -59,7 +59,7 @@ export async function completeUsageSuccess(logId: string, input: { outputCharCou
       durationMs: input.durationMs,
       jobId: input.jobId
     }
-  }).catch(() => {});
+  }).catch((err) => console.warn("Failed to record usage success", { logId, err }));
 }
 
 export async function completeUsageError(logId: string, input: { errorCode?: string; errorType?: string; durationMs?: number; jobId?: string; status?: string; source?: UsageTrafficSource; limitType?: string; limitPerMinute?: number }) {
@@ -75,7 +75,7 @@ export async function completeUsageError(logId: string, input: { errorCode?: str
       durationMs: input.durationMs,
       jobId: input.jobId
     }
-  }).catch(() => {});
+  }).catch((err) => console.warn("Failed to record usage error", { logId, err }));
 }
 
 export async function logRateLimitHit(input: Omit<CreateUsageStartInput, "stream" | "messageCount" | "inputCharCount">) {
@@ -98,7 +98,7 @@ export async function logRateLimitHit(input: Omit<CreateUsageStartInput, "stream
       messageCount: 0,
       inputCharCount: 0,
     }
-  }).catch(() => {});
+  }).catch((err) => console.warn("Failed to record rate-limit hit", { requestId: input.requestId, err }));
 }
 
 export async function logProviderRateLimitHit(input: {

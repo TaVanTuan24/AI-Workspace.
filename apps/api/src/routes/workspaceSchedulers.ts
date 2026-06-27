@@ -3,7 +3,10 @@ import { requirePermission } from "../auth/requirePermission.js";
 import { getWorkspaceContextForRequest } from "../auth/workspaceContext.js";
 import { getSchedulerFleetStatus } from "../services/schedulerFleetStatusService.js";
 
+import { attachLocalUser } from "../middleware/auth.js";
+
 export async function workspaceSchedulerRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", attachLocalUser);
   app.get("/settings/workspace/schedulers", async (request, reply) => {
     if (!(await requirePermission(request, reply, "settings.read"))) return;
 

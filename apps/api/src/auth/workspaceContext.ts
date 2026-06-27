@@ -62,6 +62,17 @@ export async function getWorkspaceContextForRequest(
   let rawRole = membership?.role;
 
   if (!membership) {
+    // A user with no *active* membership may still have an explicitly
+    // disabled/suspended one. That is a deliberate admin action and must not
+    // be silently re-granted by the single-user fallback below. Deny instead.
+    const blockedMembership = await prisma.workspaceMembership.findFirst({
+      where: { userId: user.id, status: { not: "active" } },
+      select: { id: true }
+    });
+    if (blockedMembership) {
+      return null;
+    }
+
     // Only fallback if local single user mode is enabled
     if (!env.LOCAL_SINGLE_USER_MODE) {
       throw new Error("workspace_required");
