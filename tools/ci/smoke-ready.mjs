@@ -45,9 +45,9 @@ try {
   }
 
   await waitForTcp("127.0.0.1", redisPort, 20_000);
-  await run("corepack", ["pnpm", "exec", "prisma", "generate"], smokeEnv);
-  await run("corepack", ["pnpm", "exec", "prisma", "db", "push", "--skip-generate"], smokeEnv);
-  await run("corepack", ["pnpm", "--filter", "@uaiw/api...", "build"], smokeEnv);
+  await run("pnpm", ["exec", "prisma", "generate"], smokeEnv);
+  await run("pnpm", ["exec", "prisma", "db", "push", "--skip-generate"], smokeEnv);
+  await run("pnpm", ["--filter", "@uaiw/api...", "build"], smokeEnv);
 
   apiProcess = startApi(smokeEnv);
   await pollHttp(`http://127.0.0.1:${apiPort}/health`, 200, 30_000);
@@ -73,6 +73,8 @@ function parseArgs(argv) {
       parsed.redisPort = argv[++index];
     } else if (arg === "--api-port") {
       parsed.apiPort = argv[++index];
+    } else if (arg === "--") {
+      continue;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
