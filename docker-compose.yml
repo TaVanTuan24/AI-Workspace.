@@ -25,7 +25,9 @@ services:
         BUILD_SOURCE: ${BUILD_SOURCE:-compose}
     restart: unless-stopped
     init: true
-    env_file: ${UAIW_COMPOSE_ENV_FILE:-.env}
+    env_file:
+      - path: ${UAIW_COMPOSE_ENV_FILE:-.env}
+        required: false
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -55,7 +57,9 @@ services:
         BUILD_SOURCE: ${BUILD_SOURCE:-compose}
     restart: unless-stopped
     init: true
-    env_file: ${UAIW_COMPOSE_ENV_FILE:-.env}
+    env_file:
+      - path: ${UAIW_COMPOSE_ENV_FILE:-.env}
+        required: false
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -80,7 +84,9 @@ services:
         BUILD_SOURCE: ${BUILD_SOURCE:-compose}
     restart: unless-stopped
     init: true
-    env_file: ${UAIW_COMPOSE_ENV_FILE:-.env}
+    env_file:
+      - path: ${UAIW_COMPOSE_ENV_FILE:-.env}
+        required: false
     environment:
       API_BASE_URL: http://api:4000
     depends_on:
