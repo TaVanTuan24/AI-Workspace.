@@ -2,8 +2,23 @@ import { FastifyPluginAsync } from "fastify";
 import { exportAllConversations, exportThread } from "../services/conversationExportService.js";
 import { previewConversationImport, importConversations } from "../services/conversationImportService.js";
 import { encryptConversationExport, decryptConversationBackup } from "../services/encryptedBackupService.js";
+import {
+  listThreads,
+  getThreadDetail,
+  deleteThread,
+  renameThread
+} from "../services/conversationHistoryService.js";
 import { z } from "zod";
 import { attachLocalUser } from "../middleware/auth.js";
+
+const ListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(1).optional()
+});
+
+const RenameBodySchema = z.object({
+  title: z.string().min(1).max(200)
+});
 
 const ImportRequestSchema = z.object({
   file: z.unknown(),
@@ -34,7 +49,51 @@ export const conversationsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", attachLocalUser);
   // Enforce auth manually for these endpoints, or trust the hook in server.ts
   // Assuming the `addHook('preHandler', fastify.authenticate)` is applied globally to /settings routes in server.ts.
-  
+
+  fastify.get("/settings/conversations", async (request, reply) => {
+    const parsed = ListQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid query parameters." });
+    }
+    const result = await listThreads(request.user.id, parsed.data);
+    return reply.send(result);
+  });
+
+  fastify.get("/settings/conversations/:threadId", async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const detail = await getThreadDetail(request.user.id, threadId);
+    if (!detail) {
+      return reply.code(404).send({ error: "Thread not found or access denied." });
+    }
+    return reply.send(detail);
+  });
+
+  fastify.patch("/settings/conversations/:threadId", async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const parsed = RenameBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Title must be between 1 and 200 characters." });
+    }
+    try {
+      const updated = await renameThread(request.user.id, threadId, parsed.data.title);
+      if (!updated) {
+        return reply.code(404).send({ error: "Thread not found or access denied." });
+      }
+      return reply.send({ thread: updated });
+    } catch (error: any) {
+      return reply.code(400).send({ error: error.message || "Invalid title." });
+    }
+  });
+
+  fastify.delete("/settings/conversations/:threadId", async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const deleted = await deleteThread(request.user.id, threadId);
+    if (!deleted) {
+      return reply.code(404).send({ error: "Thread not found or access denied." });
+    }
+    return reply.send({ ok: true });
+  });
+
   fastify.get("/settings/conversations/export", async (request, reply) => {
     const userId = request.user.id;
     const exportData = await exportAllConversations(userId);

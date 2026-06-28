@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Paperclip, RotateCcw, Send, Square, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Check, Download, MessageSquare, Paperclip, Pencil, Plus, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import type { ProviderConnectionSummary, ProviderEvent, ProviderId } from "@uaiw/shared/types/provider";
 import {
   apiGetProviders,
+  apiExportThread,
   cancelChatJob,
   postChat,
   postMultiChat,
@@ -15,7 +16,12 @@ import {
   apiGetModelPreferences,
   getWorkspaceNotifications,
   uploadChatAttachment,
-  type ChatAttachmentView
+  listConversationThreads,
+  getConversationThread,
+  renameConversationThread,
+  deleteConversationThread,
+  type ChatAttachmentView,
+  type ConversationThreadSummary
 } from "../../lib/api";
 import { filterVisibleNotifications, readDismissedNotifications, type DismissedNotificationMap } from "../../lib/notificationDismissals";
 
@@ -56,10 +62,16 @@ function newTurnId(): string {
 }
 
 export function ChatWorkspace() {
+  const queryClient = useQueryClient();
   const providers = useQuery({
     queryKey: ["providers"],
     queryFn: apiGetProviders
   });
+  const threadsQuery = useQuery({
+    queryKey: ["conversationThreads"],
+    queryFn: () => listConversationThreads({ limit: 100 })
+  });
+  const [historyError, setHistoryError] = useState("");
   const sourcesRef = useRef<Map<string, EventSource>>(new Map());
   const [mode, setMode] = useState<Mode>("single");
   const [selectedSingle, setSelectedSingle] = useState<ProviderId>("gemini");
@@ -221,7 +233,11 @@ export function ChatWorkspace() {
           threadId: threadId ?? undefined,
           attachmentIds: attachmentIds.length ? attachmentIds : undefined
         });
-        if (result.threadId) setThreadId(result.threadId);
+        if (result.threadId) {
+          const isNewThread = !threadId;
+          setThreadId(result.threadId);
+          if (isNewThread) void queryClient.invalidateQueries({ queryKey: ["conversationThreads"] });
+        }
         attachStream(turnId, selectedSingle, result.jobId, result.streamUrl);
       } catch (error) {
         updateTurnCard(turnId, selectedSingle, () => ({
@@ -252,7 +268,11 @@ export function ChatWorkspace() {
         threadId: threadId ?? undefined,
         attachmentIds: attachmentIds.length ? attachmentIds : undefined
       });
-      if (result.threadId) setThreadId(result.threadId);
+      if (result.threadId) {
+        const isNewThread = !threadId;
+        setThreadId(result.threadId);
+        if (isNewThread) void queryClient.invalidateQueries({ queryKey: ["conversationThreads"] });
+      }
 
       for (const error of result.errors) {
         updateTurnCard(turnId, error.provider, () => ({
@@ -286,6 +306,89 @@ export function ChatWorkspace() {
     setThreadId(null);
     setAttachments([]);
     setUploadError("");
+    setHistoryError("");
+  }
+
+  async function openThread(id: string) {
+    setHistoryError("");
+    try {
+      const detail = await getConversationThread(id);
+      closeAllStreams();
+      const hydrated: Turn[] = [];
+      let current: Turn | null = null;
+      for (const message of detail.messages) {
+        if (message.role === "user") {
+          current = { id: message.id, prompt: message.content, attachments: [], cards: {} };
+          hydrated.push(current);
+        } else {
+          if (!current) {
+            current = { id: message.id, prompt: "", attachments: [], cards: {} };
+            hydrated.push(current);
+          }
+          const provider = message.provider ?? "assistant";
+          current.cards[provider] = {
+            provider,
+            displayName: byProvider.get(provider as ProviderId)?.displayName ?? provider,
+            status: message.role === "error" ? "error" : "completed",
+            text: message.content,
+            message: message.role === "error" ? message.content : undefined
+          };
+        }
+      }
+      setTurns(hydrated);
+      setThreadId(detail.id);
+      setAttachments([]);
+      setUploadError("");
+      const threadProviders = detail.providers.filter(isProvider);
+      if (threadProviders.length === 1) {
+        setMode("single");
+        setSelectedSingle(threadProviders[0]);
+      } else if (threadProviders.length > 1) {
+        setMode("compare");
+        setSelectedCompare(threadProviders);
+      }
+    } catch (error) {
+      setHistoryError(errorMessage(error));
+    }
+  }
+
+  async function handleDeleteThread(id: string) {
+    if (typeof window !== "undefined" && !window.confirm("Delete this conversation? This cannot be undone.")) {
+      return;
+    }
+    setHistoryError("");
+    try {
+      await deleteConversationThread(id);
+      if (threadId === id) startNewConversation();
+      void queryClient.invalidateQueries({ queryKey: ["conversationThreads"] });
+    } catch (error) {
+      setHistoryError(errorMessage(error));
+    }
+  }
+
+  async function handleRenameThread(id: string, title: string) {
+    setHistoryError("");
+    try {
+      await renameConversationThread(id, title);
+      void queryClient.invalidateQueries({ queryKey: ["conversationThreads"] });
+    } catch (error) {
+      setHistoryError(errorMessage(error));
+    }
+  }
+
+  async function handleExportThread(id: string) {
+    setHistoryError("");
+    try {
+      const blob = await apiExportThread(id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `conversation-${id}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setHistoryError(errorMessage(error));
+    }
   }
 
   async function handleFilesSelected(fileList: FileList | null) {
@@ -450,7 +553,18 @@ export function ChatWorkspace() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[260px_1fr] xl:grid-cols-[260px_360px_1fr]">
+      <HistorySidebar
+        threads={threadsQuery.data?.threads ?? []}
+        loading={threadsQuery.isLoading}
+        activeThreadId={threadId}
+        error={historyError}
+        onNew={startNewConversation}
+        onOpen={(id) => void openThread(id)}
+        onRename={(id, title) => void handleRenameThread(id, title)}
+        onDelete={(id) => void handleDeleteThread(id)}
+        onExport={(id) => void handleExportThread(id)}
+      />
       <aside className="rounded-md border border-border bg-panel p-4">
         <h1 className="text-lg font-semibold">Chat</h1>
 
@@ -810,6 +924,147 @@ function StreamingResponseCard({
         {response.text || "No response yet."}
       </pre>
     </article>
+  );
+}
+
+function HistorySidebar({
+  threads,
+  loading,
+  activeThreadId,
+  error,
+  onNew,
+  onOpen,
+  onRename,
+  onDelete,
+  onExport
+}: {
+  threads: ConversationThreadSummary[];
+  loading: boolean;
+  activeThreadId: string | null;
+  error: string;
+  onNew: () => void;
+  onOpen: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+  onExport: (id: string) => void;
+}) {
+  return (
+    <aside className="flex max-h-[calc(100vh-7rem)] flex-col rounded-md border border-border bg-panel p-3">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          <MessageSquare className="h-4 w-4 text-muted" />
+          History
+        </h2>
+        <button
+          type="button"
+          onClick={onNew}
+          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-surface"
+        >
+          <Plus className="h-3 w-3" />
+          New
+        </button>
+      </div>
+
+      {error ? <div className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-600">{error}</div> : null}
+
+      <div className="mt-3 flex-1 space-y-1 overflow-y-auto">
+        {loading ? (
+          <div className="px-2 py-3 text-xs text-muted">Loading conversations…</div>
+        ) : threads.length === 0 ? (
+          <div className="px-2 py-3 text-xs text-muted">No conversations yet. Send a prompt to start one.</div>
+        ) : (
+          threads.map((thread) => (
+            <HistoryRow
+              key={thread.id}
+              thread={thread}
+              active={thread.id === activeThreadId}
+              onOpen={onOpen}
+              onRename={onRename}
+              onDelete={onDelete}
+              onExport={onExport}
+            />
+          ))
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function HistoryRow({
+  thread,
+  active,
+  onOpen,
+  onRename,
+  onDelete,
+  onExport
+}: {
+  thread: ConversationThreadSummary;
+  active: boolean;
+  onOpen: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+  onExport: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(thread.title ?? "");
+
+  function submitRename() {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== thread.title) onRename(thread.id, trimmed);
+    setEditing(false);
+  }
+
+  const updated = new Date(thread.updatedAt).toLocaleDateString();
+
+  return (
+    <div
+      className={`group rounded-md border px-2 py-2 text-sm ${
+        active ? "border-accent bg-surface" : "border-transparent hover:border-border hover:bg-surface"
+      }`}
+    >
+      {editing ? (
+        <div className="flex items-center gap-1">
+          <input
+            autoFocus
+            value={draft}
+            maxLength={200}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submitRename();
+              if (event.key === "Escape") setEditing(false);
+            }}
+            className="min-w-0 flex-1 rounded border border-border px-2 py-1 text-xs outline-none focus:border-accent"
+          />
+          <button type="button" className="text-muted hover:text-foreground" onClick={submitRename} aria-label="Save title">
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" className="text-muted hover:text-foreground" onClick={() => setEditing(false)} aria-label="Cancel rename">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <button type="button" className="block w-full text-left" onClick={() => onOpen(thread.id)}>
+            <span className="block truncate font-medium">{thread.title || "Untitled conversation"}</span>
+            <span className="mt-0.5 block truncate text-xs text-muted">
+              {thread.providers.length ? `${thread.providers.join(", ")} · ` : ""}
+              {thread.messageCount} msg{thread.messageCount === 1 ? "" : "s"} · {updated}
+            </span>
+          </button>
+          <div className="mt-1 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button type="button" className="text-muted hover:text-foreground" onClick={() => { setDraft(thread.title ?? ""); setEditing(true); }} aria-label="Rename conversation">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" className="text-muted hover:text-foreground" onClick={() => onExport(thread.id)} aria-label="Export conversation">
+              <Download className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" className="text-muted hover:text-red-600" onClick={() => onDelete(thread.id)} aria-label="Delete conversation">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

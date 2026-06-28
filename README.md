@@ -231,7 +231,9 @@ Critical no-usable-model warnings are not dismissible. Dismissal is local UI sta
 
 ---
 
-## 11. Conversation export / import
+## 11. Conversation history, export / import
+
+The chat page (`/chat`) has a **History** sidebar listing saved conversations (title, providers used, message count, last-updated). Click one to load its full transcript and continue it — follow-ups stay in the same provider-side conversation via the stored conversation URLs. Each entry can be renamed, exported, or deleted (delete cascades its messages). History is populated only when **Save history** is enabled for a turn.
 
 At `/settings/conversations`:
 

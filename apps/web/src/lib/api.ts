@@ -985,6 +985,80 @@ export async function apiExportThread(threadId: string) {
   return blob;
 }
 
+// -- Conversation History (list / detail / rename / delete) --
+
+export interface ConversationThreadSummary {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  providers: string[];
+}
+
+export interface ConversationThreadMessage {
+  id: string;
+  role: string;
+  provider: string | null;
+  content: string;
+  model: string | null;
+  createdAt: string;
+}
+
+export interface ConversationThreadDetail {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+  providers: string[];
+  messages: ConversationThreadMessage[];
+}
+
+export async function listConversationThreads(
+  options: { limit?: number; cursor?: string } = {}
+): Promise<{ threads: ConversationThreadSummary[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/settings/conversations${query ? `?${query}` : ""}`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load conversations"));
+  return response.json();
+}
+
+export async function getConversationThread(threadId: string): Promise<ConversationThreadDetail> {
+  const response = await fetch(`${API_BASE_URL}/settings/conversations/${threadId}`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load conversation"));
+  return response.json();
+}
+
+export async function renameConversationThread(
+  threadId: string,
+  title: string
+): Promise<{ thread: ConversationThreadSummary }> {
+  const response = await fetch(`${API_BASE_URL}/settings/conversations/${threadId}`, {
+    method: "PATCH",
+    headers: { "x-local-user-id": "local-user", "Content-Type": "application/json" },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to rename conversation"));
+  return response.json();
+}
+
+export async function deleteConversationThread(threadId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/settings/conversations/${threadId}`, {
+    method: "DELETE",
+    headers: { "x-local-user-id": "local-user" }
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete conversation"));
+}
+
 export async function apiPreviewConversationImport(fileData: any) {
   const response = await fetch(`${API_BASE_URL}/settings/conversations/import/preview`, {
     method: "POST",

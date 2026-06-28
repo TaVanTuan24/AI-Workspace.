@@ -4,10 +4,12 @@ import { conversationsRoutes } from "../conversations.js";
 import * as exportService from "../../services/conversationExportService.js";
 import * as importService from "../../services/conversationImportService.js";
 import * as encryptedBackupService from "../../services/encryptedBackupService.js";
+import * as historyService from "../../services/conversationHistoryService.js";
 
 vi.mock("../../services/conversationExportService.js");
 vi.mock("../../services/conversationImportService.js");
 vi.mock("../../services/encryptedBackupService.js");
+vi.mock("../../services/conversationHistoryService.js");
 
 const buildApp = () => {
   const app = Fastify();
@@ -91,6 +93,92 @@ describe("conversations routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual(mockResult);
+    });
+  });
+
+  describe("GET /settings/conversations (list)", () => {
+    it("returns thread list", async () => {
+      const mockResult = {
+        threads: [
+          { id: "t1", title: "Hello", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z", messageCount: 4, providers: ["chatgpt", "gemini"] }
+        ],
+        nextCursor: null
+      };
+      vi.mocked(historyService.listThreads).mockResolvedValueOnce(mockResult as any);
+
+      const response = await app.inject({ method: "GET", url: "/settings/conversations?limit=10" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(mockResult);
+      expect(historyService.listThreads).toHaveBeenCalledWith(expect.any(String), { limit: 10 });
+    });
+
+    it("rejects an invalid limit", async () => {
+      const response = await app.inject({ method: "GET", url: "/settings/conversations?limit=0" });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe("GET /settings/conversations/:threadId (detail)", () => {
+    it("returns thread detail", async () => {
+      const mockDetail = {
+        id: "t1",
+        title: "Hello",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+        providers: ["chatgpt"],
+        messages: [{ id: "m1", role: "user", provider: null, content: "hi", model: null, createdAt: "2026-01-01T00:00:00.000Z" }]
+      };
+      vi.mocked(historyService.getThreadDetail).mockResolvedValueOnce(mockDetail as any);
+
+      const response = await app.inject({ method: "GET", url: "/settings/conversations/t1" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(mockDetail);
+    });
+
+    it("returns 404 when the thread is missing", async () => {
+      vi.mocked(historyService.getThreadDetail).mockResolvedValueOnce(null);
+      const response = await app.inject({ method: "GET", url: "/settings/conversations/missing" });
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe("PATCH /settings/conversations/:threadId (rename)", () => {
+    it("renames a thread", async () => {
+      const mockThread = { id: "t1", title: "Renamed", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z", messageCount: 2, providers: [] };
+      vi.mocked(historyService.renameThread).mockResolvedValueOnce(mockThread as any);
+
+      const response = await app.inject({ method: "PATCH", url: "/settings/conversations/t1", payload: { title: "Renamed" } });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ thread: mockThread });
+    });
+
+    it("rejects an empty title", async () => {
+      const response = await app.inject({ method: "PATCH", url: "/settings/conversations/t1", payload: { title: "" } });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("returns 404 when the thread is missing", async () => {
+      vi.mocked(historyService.renameThread).mockResolvedValueOnce(null);
+      const response = await app.inject({ method: "PATCH", url: "/settings/conversations/missing", payload: { title: "x" } });
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe("DELETE /settings/conversations/:threadId", () => {
+    it("deletes a thread", async () => {
+      vi.mocked(historyService.deleteThread).mockResolvedValueOnce(true);
+      const response = await app.inject({ method: "DELETE", url: "/settings/conversations/t1" });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ ok: true });
+    });
+
+    it("returns 404 when the thread is missing", async () => {
+      vi.mocked(historyService.deleteThread).mockResolvedValueOnce(false);
+      const response = await app.inject({ method: "DELETE", url: "/settings/conversations/missing" });
+      expect(response.statusCode).toBe(404);
     });
   });
 });
