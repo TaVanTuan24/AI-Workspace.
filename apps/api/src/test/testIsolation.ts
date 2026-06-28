@@ -1,5 +1,4 @@
 import { prisma } from "../services/prisma.js";
-import { ensureDefaultWorkspace } from "../services/workspaceService.js";
 
 /**
  * Generates a deterministic run ID using process metadata to avoid conflicts
@@ -61,47 +60,12 @@ export async function cleanupTestUserData(userId: string): Promise<void> {
   await prisma.userModelPreference.deleteMany({ where: { userId } });
   await prisma.userSettings.deleteMany({ where: { userId } });
   await prisma.auditLog.deleteMany({ where: { userId } });
-  await prisma.userRoleAuditEvent.deleteMany({
-    where: {
-      OR: [
-        { actorUserId: userId },
-        { targetUserId: userId }
-      ]
-    }
-  });
   await prisma.automationJob.deleteMany({ where: { userId } });
-  
-  await prisma.providerHealthIncident.deleteMany({ where: { userId } });
-  
-  // 6. Workspace Memberships and Invites
-  // First find workspaces this user belongs to, so we can clean them up after membership/user is gone.
-  // We only clean up non-default workspaces to avoid breaking global fallback state.
-  const memberships = await prisma.workspaceMembership.findMany({
-    where: { userId },
-    select: { workspaceId: true }
-  });
-  const testWorkspaceIds = memberships.map(m => m.workspaceId);
 
-  await prisma.workspaceMembership.deleteMany({ where: { userId } });
-  // We can't cleanly delete WorkspaceInvite by userId because it uses email, 
-  // but we can query by email if needed, or assume it's cleaned manually if tied strictly to an email.
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-  if (user?.email) {
-    await prisma.workspaceInvite.deleteMany({ where: { email: user.email } });
-  }
+  await prisma.providerHealthIncident.deleteMany({ where: { userId } });
 
   // Finally, the user record itself
   await prisma.user.deleteMany({ where: { id: userId } });
-
-  // Clean up any dynamically created workspaces
-  if (testWorkspaceIds.length > 0) {
-    await prisma.workspace.deleteMany({
-      where: {
-        id: { in: testWorkspaceIds },
-        slug: { not: "local" }
-      }
-    });
-  }
 }
 
 /**
@@ -123,19 +87,5 @@ export function withTestUserScope(prefix: string) {
     cleanup: async () => {
       await cleanupTestUserData(userId);
     }
-  };
-}
-
-/**
- * Async version that also ensures the default workspace exists
- * and returns its ID. Use this in tests that need workspace scoping.
- */
-export async function withTestUserScopeAsync(prefix: string) {
-  const scope = withTestUserScope(prefix);
-  const workspace = await ensureDefaultWorkspace();
-
-  return {
-    ...scope,
-    workspaceId: workspace.id
   };
 }

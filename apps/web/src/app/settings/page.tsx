@@ -14,18 +14,15 @@ import {
   RefreshCw,
   SlidersHorizontal,
   TimerReset,
-  UsersRound,
   X
 } from "lucide-react";
 import {
   getOnboardingStatus,
   getSettingsOverview,
   getWorkspaceNotifications,
-  getWorkspaceInfo,
   type OnboardingStatus,
   type SettingsOverview,
-  type WorkspaceNotification,
-  type WorkspaceInfo
+  type WorkspaceNotification
 } from "../../lib/api";
 import {
   dismissNotification,
@@ -71,19 +68,11 @@ const quickLinks = [
     label: "Notification preferences",
     description: "Choose which operational alerts appear in the app.",
     icon: Bell
-  },
-  {
-    href: "/settings/users",
-    label: "Users & roles",
-    description: "Review users and manage role boundaries.",
-    icon: UsersRound,
-    permission: "users.read"
   }
 ];
 
 export default function SettingsOverviewPage() {
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
-  const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
   const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [dismissed, setDismissed] = useState<DismissedNotificationMap>({});
@@ -98,15 +87,13 @@ export default function SettingsOverviewPage() {
       try {
         setLoading(true);
         setError("");
-        const [data, wsInfo, notificationData, onboardingData] = await Promise.all([
+        const [data, notificationData, onboardingData] = await Promise.all([
           getSettingsOverview(),
-          getWorkspaceInfo(),
           getWorkspaceNotifications(),
           getOnboardingStatus()
         ]);
         if (!cancelled) {
           setOverview(data);
-          setWorkspaceInfo(wsInfo);
           setNotifications(notificationData.notifications);
           setOnboarding(onboardingData);
         }
@@ -139,14 +126,9 @@ export default function SettingsOverviewPage() {
     <div className="space-y-8 p-0 lg:p-2">
       <header>
         <div className="flex items-center gap-2 mb-2">
-          {workspaceInfo && (
-            <span className="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
-              {workspaceInfo.name}
-            </span>
-          )}
-          {workspaceInfo?.currentUser?.role && (
+          {overview?.currentUser?.role && (
             <span className="inline-flex items-center rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-slate-300 ring-1 ring-inset ring-slate-700">
-              {workspaceInfo.currentUser.role}
+              {overview.currentUser.role}
             </span>
           )}
         </div>
@@ -258,7 +240,7 @@ export default function SettingsOverviewPage() {
 
           {overview.providers.total === 0 && overview.apiKeys.active === 0 && (
             <section className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-5 text-center">
-              <h2 className="text-lg font-semibold text-slate-100">This workspace is empty</h2>
+              <h2 className="text-lg font-semibold text-slate-100">Nothing set up yet</h2>
               <p className="mt-2 text-sm text-slate-400">
                 Connect a provider or create an internal API key to get started.
               </p>
@@ -319,7 +301,7 @@ export default function SettingsOverviewPage() {
               {quickLinks
                 .filter((link) => {
                   if (!("permission" in link)) return true;
-                  return workspaceInfo?.currentUser.permissions.includes(link.permission as any) ?? false;
+                  return overview?.currentUser.permissions.includes(link.permission as any) ?? false;
                 })
                 .map((link) => (
                 <Link

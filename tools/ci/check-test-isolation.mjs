@@ -19,15 +19,9 @@ const RISKY_PATTERNS = [
     category: 'global-prisma-mutation'
   },
   {
-    // Block unscoped or overly broad deletion of specific workspace models
-    regex: /\bprisma\.(workspace|workspaceMembership|workspaceInvite|userRoleAuditEvent|providerHealthIncident)\.deleteMany\(\s*\{?\s*\}?\s*\)/,
-    category: 'unscoped-workspace-model-mutation'
-  },
-  {
-    // Block direct usage of ensureDefaultWorkspace in general tests
-    regex: /\bensureDefaultWorkspace\(\)/,
-    category: 'implicit-default-workspace-fallback',
-    allowedFiles: ['testIsolation.ts', 'testIsolation.test.ts', 'workspaceService.test.ts', 'workspaceContext.ts', 'workspaceTestContext.ts']
+    // Block unscoped or overly broad deletion of shared models
+    regex: /\bprisma\.(providerHealthIncident)\.deleteMany\(\s*\{?\s*\}?\s*\)/,
+    category: 'unscoped-shared-model-mutation'
   },
   {
     regex: /\.\$executeRaw\b|\.\$executeRawUnsafe\b|\.\$queryRawUnsafe\b/,

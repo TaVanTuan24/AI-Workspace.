@@ -8,36 +8,8 @@ import {
 
 vi.mock("../../middleware/auth.js", () => ({
   attachLocalUser: async (request: any) => {
-    request.user = { id: "test-user-id", email: "test@example.com" };
+    request.user = { id: "test-user-id", email: "test@example.com", role: "owner" };
   }
-}));
-
-vi.mock("../../auth/workspaceContext.js", () => ({
-  getWorkspaceContextForRequest: vi.fn(async (request: any) => {
-    if (!request.user) return null;
-    request.workspaceContext = {
-      userId: request.user.id,
-      workspaceId: "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-    return request.workspaceContext;
-  }),
-  requireWorkspaceContext: vi.fn(async (request: any, reply: any) => {
-    if (!request.user) {
-      reply.code(401).send({ error: "Unauthorized" });
-      return null;
-    }
-    request.workspaceContext = {
-      userId: request.user.id,
-      workspaceId: "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-    return request.workspaceContext;
-  })
 }));
 
 vi.mock("../../services/notificationPreferenceService.js", () => ({

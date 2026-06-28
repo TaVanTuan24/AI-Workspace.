@@ -139,7 +139,7 @@ export default function NotificationPreferencesPage() {
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-100">Notification Preferences</h1>
         <p className="mt-2 max-w-3xl text-slate-400">
-          Choose which in-app operational alerts appear across the workspace.
+          Choose which in-app operational alerts appear.
         </p>
       </header>
 

@@ -7,32 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  users                          User[]
-  ProviderConnection             ProviderConnection[]
-  ProviderDiagnosticsBaseline    ProviderDiagnosticsBaseline[]
-  ProviderDiagnosticsDriftAlert  ProviderDiagnosticsDriftAlert[]
-  InternalApiKey                 InternalApiKey[]
-  InternalApiUsageLog            InternalApiUsageLog[]
-  UserModelPreference            UserModelPreference[]
-  ProviderRateLimitSetting       ProviderRateLimitSetting[]
-  ProviderHealthIncident         ProviderHealthIncident[]
-  ProviderDiagnosticsRun         ProviderDiagnosticsRun[]
-  memberships                    WorkspaceMembership[]
-  invites                        WorkspaceInvite[]
-  userRoleAuditEvents            UserRoleAuditEvent[]
-  inviteDeliveryAttempts         WorkspaceInviteDeliveryAttempt[]
-  quota                          WorkspaceQuota?
-  quotaEvents                    WorkspaceQuotaEvent[]
-
-  @@map("workspaces")
-}
 
 model User {
   id                              String                           @id @default(cuid())
@@ -41,8 +15,6 @@ model User {
   localAuthSecret                 String?                          @map("local_auth_secret")
   displayName                     String?                          @map("display_name")
   role                            String                           @default("owner")
-  workspaceId                     String?                          @map("workspace_id")
-  workspace                       Workspace?                       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt                       DateTime                         @default(now()) @map("created_at")
   updatedAt                       DateTime                         @updatedAt @map("updated_at")
   providerSessions                ProviderConnection[]
@@ -62,19 +34,12 @@ model User {
   providerDiagnosticsRuns         ProviderDiagnosticsRun[]
   providerDiagnosticsBaselines    ProviderDiagnosticsBaseline[]
   providerDiagnosticsDriftAlerts  ProviderDiagnosticsDriftAlert[]
-  roleAuditEventsAsActor          UserRoleAuditEvent[]             @relation("RoleAuditActor")
-  roleAuditEventsAsTarget         UserRoleAuditEvent[]             @relation("RoleAuditTarget")
-  memberships                     WorkspaceMembership[]
-  invitesSent                     WorkspaceInvite[]                @relation("InviteSender")
 
-  @@index([workspaceId])
   @@map("users")
 }
 
 model ProviderConnection {
   id                   String     @id @default(cuid())
-  workspaceId          String?    @map("workspace_id")
-  workspace            Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId               String     @map("user_id")
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider             String
@@ -93,14 +58,11 @@ model ProviderConnection {
 
   @@unique([userId, provider])
   @@index([status])
-  @@index([workspaceId])
   @@map("provider_connections")
 }
 
 model ProviderDiagnosticsBaseline {
   id           String     @id @default(cuid())
-  workspaceId  String?    @map("workspace_id")
-  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId       String     @map("user_id")
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider     String
@@ -122,14 +84,11 @@ model ProviderDiagnosticsBaseline {
 
   @@index([userId, provider, isActive])
   @@index([userId, connectionId])
-  @@index([workspaceId])
   @@map("provider_diagnostics_baselines")
 }
 
 model ProviderDiagnosticsDriftAlert {
   id           String     @id @default(cuid())
-  workspaceId  String?    @map("workspace_id")
-  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId       String     @map("user_id")
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider     String
@@ -159,7 +118,6 @@ model ProviderDiagnosticsDriftAlert {
   @@index([userId, provider, status])
   @@index([userId, createdAt])
   @@index([userId, baselineId])
-  @@index([workspaceId])
   @@map("provider_diagnostics_drift_alerts")
 }
 
@@ -237,44 +195,7 @@ model MessageAttachment {
   @@map("message_attachments")
 }
 
-model WorkspaceQuota {
-  id          String   @id @default(cuid())
-  workspaceId String   @unique @map("workspace_id")
-  plan        String   @default("local")
 
-  maxMembers              Int? @map("max_members")
-  maxInvites              Int? @map("max_invites")
-  maxApiKeys              Int? @map("max_api_keys")
-  maxProviderConnections  Int? @map("max_provider_connections")
-  maxDiagnosticsBaselines Int? @map("max_diagnostics_baselines")
-  maxMonthlyApiRequests   Int? @map("max_monthly_api_requests")
-  maxMonthlyInviteEmails  Int? @map("max_monthly_invite_emails")
-
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@map("workspace_quotas")
-}
-
-model WorkspaceQuotaEvent {
-  id                 String   @id @default(cuid())
-  workspaceId        String   @map("workspace_id")
-  actorUserId        String?  @map("actor_user_id")
-  resource           String
-  limit              Int?
-  used               Int
-  attemptedIncrement Int      @default(1) @map("attempted_increment")
-  source             String
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId, createdAt])
-  @@index([workspaceId, resource, createdAt])
-  @@map("workspace_quota_events")
-}
 
 model AutomationJob {
   id               String      @id @default(cuid())
@@ -315,33 +236,9 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-model UserRoleAuditEvent {
-  id           String   @id @default(cuid())
-  workspaceId  String   @map("workspace_id")
-  actorUserId  String   @map("actor_user_id")
-  targetUserId String?  @map("target_user_id")
-  previousRole   String?  @map("previous_role")
-  nextRole       String?  @map("next_role")
-  previousStatus String?  @map("previous_status")
-  nextStatus     String?  @map("next_status")
-  inviteId       String?  @map("invite_id")
-  action         String
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  actorUser  User      @relation("RoleAuditActor", fields: [actorUserId], references: [id], onDelete: Cascade)
-  targetUser User?     @relation("RoleAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
-
-  @@index([workspaceId, createdAt])
-  @@index([actorUserId, createdAt])
-  @@index([targetUserId, createdAt])
-  @@map("user_role_audit_events")
-}
 
 model InternalApiKey {
   id                 String     @id @default(cuid())
-  workspaceId        String?    @map("workspace_id")
-  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId             String     @map("user_id")
   name               String
   keyPrefix          String     @map("key_prefix")
@@ -361,16 +258,13 @@ model InternalApiKey {
   @@index([userId])
   @@index([keyPrefix])
   @@index([status])
-  @@index([workspaceId])
   @@map("internal_api_keys")
 }
 
 model InternalApiUsageLog {
   id String @id @default(cuid())
 
-  workspaceId String? @map("workspace_id")
 
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   userId       String  @map("user_id")
   apiKeyId     String? @map("api_key_id")
@@ -411,7 +305,6 @@ model InternalApiUsageLog {
   @@index([model, createdAt])
   @@index([provider, createdAt])
   @@index([status, createdAt])
-  @@index([workspaceId])
   @@map("internal_api_usage_logs")
 }
 
@@ -436,8 +329,6 @@ model UserSettings {
 
 model UserModelPreference {
   id                    String     @id @default(cuid())
-  workspaceId           String?    @map("workspace_id")
-  workspace             Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId                String     @map("user_id")
   modelId               String     @map("model_id")
   provider              String
@@ -454,14 +345,11 @@ model UserModelPreference {
   @@unique([userId, modelId])
   @@index([userId, enabled])
   @@index([userId, priority])
-  @@index([workspaceId])
   @@map("user_model_preferences")
 }
 
 model ProviderRateLimitSetting {
   id                String     @id @default(cuid())
-  workspaceId       String?    @map("workspace_id")
-  workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId            String     @map("user_id")
   provider          String
   requestsPerMinute Int?       @map("requests_per_minute")
@@ -473,7 +361,6 @@ model ProviderRateLimitSetting {
 
   @@unique([userId, provider])
   @@index([provider])
-  @@index([workspaceId])
   @@map("provider_rate_limit_settings")
 }
 
@@ -538,8 +425,6 @@ model ProviderLiveSubModelCache {
 
 model ProviderHealthIncident {
   id           String     @id @default(cuid())
-  workspaceId  String?    @map("workspace_id")
-  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId       String     @map("user_id")
   provider     String
   connectionId String?    @map("connection_id")
@@ -566,14 +451,11 @@ model ProviderHealthIncident {
   @@index([userId, provider, startedAt])
   @@index([userId, status])
   @@index([userId, resolvedAt])
-  @@index([workspaceId])
   @@map("provider_health_incidents")
 }
 
 model ProviderDiagnosticsRun {
   id           String     @id @default(cuid())
-  workspaceId  String?    @map("workspace_id")
-  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId       String     @map("user_id")
   provider     String
   connectionId String?    @map("connection_id")
@@ -601,76 +483,8 @@ model ProviderDiagnosticsRun {
   @@index([userId, provider, startedAt])
   @@index([userId, incidentId])
   @@index([userId, status])
-  @@index([workspaceId])
   @@map("provider_diagnostics_runs")
 }
 
-model WorkspaceMembership {
-  id String @id @default(cuid())
 
-  workspaceId String @map("workspace_id")
-  userId      String @map("user_id")
-  role        String
 
-  status    String   @default("active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, userId])
-  @@index([userId])
-  @@index([workspaceId])
-  @@index([workspaceId, role])
-  @@map("workspace_memberships")
-}
-
-model WorkspaceInvite {
-  id String @id @default(cuid())
-
-  workspaceId String @map("workspace_id")
-  email       String
-  role        String
-
-  tokenHash  String    @map("token_hash")
-  status     String    @default("pending")
-  expiresAt  DateTime  @map("expires_at")
-  acceptedAt DateTime? @map("accepted_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  invitedByUserId String @map("invited_by_user_id")
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  invitedBy User      @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: Cascade)
-
-  deliveryAttempts WorkspaceInviteDeliveryAttempt[]
-
-  @@index([workspaceId, status])
-  @@index([email])
-  @@index([tokenHash])
-  @@map("workspace_invites")
-}
-
-model WorkspaceInviteDeliveryAttempt {
-  id String @id @default(cuid())
-
-  workspaceId String @map("workspace_id")
-  inviteId    String @map("invite_id")
-
-  channel                String
-  status                 String
-  recipientEmailRedacted String? @map("recipient_email_redacted")
-  reason                 String?
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  invite    WorkspaceInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId, createdAt])
-  @@index([inviteId])
-  @@map("workspace_invite_delivery_attempts")
-}

@@ -107,7 +107,6 @@ export async function recordHealthObservation(
   const created = await prisma.providerHealthIncident.create({
     data: {
       userId,
-      workspaceId: (await prisma.user.findUnique({ where: { id: userId } }))?.workspaceId || null,
       provider: health.provider,
       status,
       severity: getSeverityForStatus(status),

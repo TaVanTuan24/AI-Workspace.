@@ -19,17 +19,7 @@ import { notificationEventsRoutes } from "./routes/notificationEvents.js";
 import { notificationPreferenceRoutes } from "./routes/notificationPreferences.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { providerLiveSubModelsRoutes } from "./routes/providerLiveSubModels.js";
-import { userRoutes } from "./routes/users.js";
-import { workspaceRoutes } from "./routes/workspace.js";
-import { workspaceInviteRoutes } from "./routes/workspaceInvites.js";
-import { workspaceQuotaRoutes } from "./routes/workspaceQuota.js";
-import { workspaceActivityRoutes } from "./routes/workspaceActivity.js";
-import { workspaceAdminOverviewRoutes } from "./routes/workspaceAdminOverview.js";
-import { workspaceSchedulerRoutes } from "./routes/workspaceSchedulers.js";
-import { workspaceAdminExportRoutes } from "./routes/workspaceAdminExport.js";
 import { providerHealthScheduler } from "./services/providerHealthScheduler.js";
-import { workspaceInviteExpiryScheduler } from "./services/workspaceInviteExpiryScheduler.js";
-import { workspaceQuotaAlertScheduler } from "./services/workspaceQuotaAlertScheduler.js";
 import { healthRoutes } from "./routes/health.js";
 import { prisma } from "./services/prisma.js";
 import { closeChatQueue } from "./services/chatQueue.js";
@@ -69,20 +59,10 @@ await app.register(notificationPreferenceRoutes);
 await app.register(onboardingRoutes);
 await app.register(conversationsRoutes);
 await app.register(providerLiveSubModelsRoutes);
-await app.register(userRoutes);
-await app.register(workspaceRoutes);
-await app.register(workspaceInviteRoutes);
-await app.register(workspaceQuotaRoutes);
-await app.register(workspaceActivityRoutes);
-await app.register(workspaceAdminOverviewRoutes);
-await app.register(workspaceSchedulerRoutes);
-await app.register(workspaceAdminExportRoutes);
 
 app.addHook("onClose", async () => {
   await Promise.allSettled([
-    providerHealthScheduler.stop(),
-    workspaceInviteExpiryScheduler.stop(),
-    workspaceQuotaAlertScheduler.stop()
+    providerHealthScheduler.stop()
   ]);
   await Promise.allSettled([
     closeChatQueue(),
@@ -124,8 +104,6 @@ process.once("SIGINT", (signal) => {
 try {
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
   providerHealthScheduler.start();
-  workspaceInviteExpiryScheduler.start();
-  workspaceQuotaAlertScheduler.start();
 } catch (error) {
   app.log.error({ err: error }, "API startup failed");
   await app.close().catch(() => {});

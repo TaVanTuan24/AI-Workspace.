@@ -29,13 +29,13 @@ describe("redactSecrets", () => {
 
   it("redacts exact string matches from env", () => {
     const env = {
-      WORKSPACE_INVITE_SMTP_PASSWORD: "mySmtpPassword123!",
+      API_KEY_HASH_SECRET: "hashSecret789",
       INTERNAL_API_KEY: "internalKey456"
     } as ApiEnv;
-    
-    const input = "Error: SMTP auth failed for password mySmtpPassword123! or maybe internalKey456 was used.";
-    const expected = "Error: SMTP auth failed for password *** or maybe *** was used.";
-    
+
+    const input = "Error: auth failed with secret hashSecret789 or maybe internalKey456 was used.";
+    const expected = "Error: auth failed with secret *** or maybe *** was used.";
+
     expect(redactSecrets(input, env)).toBe(expected);
   });
 

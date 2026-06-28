@@ -17,7 +17,6 @@ const USAGE_TRAFFIC_SOURCES: UsageTrafficSource[] = [
 
 export interface CreateUsageStartInput {
   userId: string;
-  workspaceId: string;
   apiKeyId?: string;
   apiKeyPrefix?: string;
   model: string;
@@ -34,7 +33,6 @@ export async function createUsageStart(input: CreateUsageStartInput) {
   return prisma.internalApiUsageLog.create({
     data: {
       userId: input.userId,
-      workspaceId: input.workspaceId,
       apiKeyId: input.apiKeyId,
       apiKeyPrefix: input.apiKeyPrefix,
       model: input.model,
@@ -82,7 +80,6 @@ export async function logRateLimitHit(input: Omit<CreateUsageStartInput, "stream
   await prisma.internalApiUsageLog.create({
     data: {
       userId: input.userId,
-      workspaceId: input.workspaceId,
       apiKeyId: input.apiKeyId,
       apiKeyPrefix: input.apiKeyPrefix,
       model: input.model,
@@ -103,7 +100,6 @@ export async function logRateLimitHit(input: Omit<CreateUsageStartInput, "stream
 
 export async function logProviderRateLimitHit(input: {
   userId: string;
-  workspaceId: string;
   provider: ProviderId;
   modelId?: string | null;
   source: UsageTrafficSource;
@@ -116,7 +112,6 @@ export async function logProviderRateLimitHit(input: {
   const model = input.modelId ?? modelIdForProvider(input.provider);
   const data = {
     userId: input.userId,
-    workspaceId: input.workspaceId,
     apiKeyId: input.apiKeyId ?? null,
     apiKeyName: input.apiKeyName ?? null,
     apiKeyPrefix: input.apiKeyPrefix ?? null,

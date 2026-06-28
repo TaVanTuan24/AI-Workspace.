@@ -40,7 +40,6 @@ describe("providerRateLimitService", () => {
       {
         id: "limit-1",
         userId: "user-1",
-        workspaceId: "ws-1",
         provider: "claude",
         requestsPerMinute: 5,
         enabled: true,
@@ -94,7 +93,6 @@ describe("providerRateLimitService", () => {
     vi.mocked(prisma.providerRateLimitSetting.findUnique).mockResolvedValueOnce({
       id: "limit-1",
       userId: "user-1",
-      workspaceId: "ws-1",
       provider: "claude",
       requestsPerMinute: 1,
       enabled: true,

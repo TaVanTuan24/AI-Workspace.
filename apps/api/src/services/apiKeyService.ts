@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "./prisma.js";
 import { env } from "../config/env.js";
-import { assertWorkspaceQuota } from "./workspaceQuotaService.js";
 
 export interface SafeApiKey {
   id: string;
@@ -21,7 +20,6 @@ export interface SafeApiKey {
 
 export interface CreateApiKeyInput {
   userId: string;
-  workspaceId: string;
   name: string;
   allowedModelIds?: string[];
   rateLimitPerMinute?: number | null;
@@ -75,13 +73,6 @@ export async function createApiKey(input: CreateApiKeyInput): Promise<{ rawKey: 
     throw new Error("DB API Keys are not enabled.");
   }
 
-  await assertWorkspaceQuota({
-    workspaceId: input.workspaceId,
-    resource: 'apiKeys',
-    actorUserId: input.userId,
-    source: 'api_key_create'
-  });
-  
   const rawKey = generateInternalApiKey();
   const keyPrefix = getKeyPrefix(rawKey);
   const keyLast4 = getKeyLast4(rawKey);
@@ -90,7 +81,6 @@ export async function createApiKey(input: CreateApiKeyInput): Promise<{ rawKey: 
   const dbRecord = await prisma.internalApiKey.create({
     data: {
       userId: input.userId,
-      workspaceId: input.workspaceId,
       name: input.name,
       keyPrefix,
       keyLast4,
@@ -115,18 +105,18 @@ export async function createApiKey(input: CreateApiKeyInput): Promise<{ rawKey: 
   return { rawKey, record: mapToSafeApiKey(dbRecord) };
 }
 
-export async function listApiKeys(userId: string, workspaceId: string): Promise<SafeApiKey[]> {
+export async function listApiKeys(userId: string): Promise<SafeApiKey[]> {
   const records = await prisma.internalApiKey.findMany({
-    where: { userId, workspaceId },
+    where: { userId },
     orderBy: { createdAt: "desc" },
     include: { modelScopes: true }
   });
   return records.map(mapToSafeApiKey);
 }
 
-export async function revokeApiKey(userId: string, workspaceId: string, keyId: string): Promise<void> {
+export async function revokeApiKey(userId: string, keyId: string): Promise<void> {
   await prisma.internalApiKey.update({
-    where: { id: keyId, userId, workspaceId },
+    where: { id: keyId, userId },
     data: {
       status: "revoked",
       revokedAt: new Date()
@@ -136,12 +126,11 @@ export async function revokeApiKey(userId: string, workspaceId: string, keyId: s
 
 export async function rotateApiKey(
   userId: string,
-  workspaceId: string,
   keyId: string, 
   preserveScopes: boolean = true
 ): Promise<{ rawKey: string; record: SafeApiKey }> {
   const existingKey = await prisma.internalApiKey.findUnique({
-    where: { id: keyId, userId, workspaceId },
+    where: { id: keyId, userId },
     include: { modelScopes: true }
   });
 
@@ -149,7 +138,7 @@ export async function rotateApiKey(
     throw new Error("API Key not found or does not belong to user.");
   }
 
-  await revokeApiKey(userId, workspaceId, keyId);
+  await revokeApiKey(userId, keyId);
   await prisma.internalApiKey.update({
     where: { id: keyId },
     data: { rotatedAt: new Date() }
@@ -159,17 +148,16 @@ export async function rotateApiKey(
   const allowedModelIds = preserveScopes ? existingKey.modelScopes.map(s => s.modelId) : undefined;
   const rateLimitPerMinute = existingKey.rateLimitPerMinute;
   
-  return createApiKey({ userId, workspaceId, name, allowedModelIds, rateLimitPerMinute });
+  return createApiKey({ userId, name, allowedModelIds, rateLimitPerMinute });
 }
 
 export async function updateApiKeyRateLimit(
   userId: string,
-  workspaceId: string,
   keyId: string,
   rateLimitPerMinute: number | null
 ): Promise<SafeApiKey> {
   const existingKey = await prisma.internalApiKey.findUnique({
-    where: { id: keyId, userId, workspaceId }
+    where: { id: keyId, userId }
   });
 
   if (!existingKey) {
@@ -195,7 +183,7 @@ export async function updateApiKeyRateLimit(
   return mapToSafeApiKey(updatedKey);
 }
 
-export async function verifyApiKey(rawKey: string): Promise<{ userId: string; workspaceId: string | null; keyId: string; keyPrefix: string; rateLimitPerMinute: number | null } | null> {
+export async function verifyApiKey(rawKey: string): Promise<{ userId: string; keyId: string; keyPrefix: string; rateLimitPerMinute: number | null } | null> {
   if (!rawKey.startsWith("uai_live_")) {
     return null;
   }
@@ -215,7 +203,6 @@ export async function verifyApiKey(rawKey: string): Promise<{ userId: string; wo
     if (crypto.timingSafeEqual(Buffer.from(key.keyHash), Buffer.from(hash))) {
       return {
         userId: key.userId,
-        workspaceId: key.workspaceId,
         keyId: key.id,
         keyPrefix: key.keyPrefix,
         rateLimitPerMinute: key.rateLimitPerMinute
@@ -234,10 +221,10 @@ export async function markLastUsed(keyId: string): Promise<void> {
   }).catch(() => {});
 }
 
-export async function setApiKeyModelScopes(userId: string, workspaceId: string, keyId: string, modelIds: string[]): Promise<SafeApiKey> {
+export async function setApiKeyModelScopes(userId: string, keyId: string, modelIds: string[]): Promise<SafeApiKey> {
   // Verify key belongs to user
   const existingKey = await prisma.internalApiKey.findUnique({
-    where: { id: keyId, userId, workspaceId }
+    where: { id: keyId, userId }
   });
 
   if (!existingKey) {

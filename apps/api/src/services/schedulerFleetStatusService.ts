@@ -26,9 +26,7 @@ export interface SchedulerFleetStatusDTO {
 // ---------------------------------------------------------------------------
 
 const KNOWN_SCHEDULERS: Array<{ name: string; enabledKey: keyof typeof env }> = [
-  { name: "provider_health", enabledKey: "PROVIDER_HEALTH_SCHEDULER_ENABLED" },
-  { name: "workspace_invite_expiry", enabledKey: "WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED" },
-  { name: "workspace_quota_alerts", enabledKey: "WORKSPACE_QUOTA_ALERT_SCHEDULER_ENABLED" },
+  { name: "provider_health", enabledKey: "PROVIDER_HEALTH_SCHEDULER_ENABLED" }
 ];
 
 // ---------------------------------------------------------------------------

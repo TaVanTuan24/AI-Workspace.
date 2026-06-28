@@ -17,12 +17,6 @@ describe("apiUsageService", () => {
     await prisma.internalApiKey.deleteMany({ where: { userId: "test-user-usage" } });
     await prisma.user.deleteMany({ where: { id: "test-user-usage" } });
 
-    await prisma.workspace.upsert({
-      where: { id: "test-ws" },
-      update: {},
-      create: { id: "test-ws", name: "Test Workspace", slug: "test-ws-usage" }
-    });
-
     await prisma.user.create({
       data: {
         id: "test-user-usage",
@@ -39,7 +33,7 @@ describe("apiUsageService", () => {
 
   it("should create a usage log and not store prompt text", async () => {
     const log = await createUsageStart({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "chatgpt-web",
       provider: "chatgpt",
       endpoint: "/v1/chat/completions",
@@ -59,7 +53,7 @@ describe("apiUsageService", () => {
 
   it("should complete a usage log with success", async () => {
     const log = await createUsageStart({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "gemini-web",
       provider: "gemini",
       endpoint: "/v1/chat/completions",
@@ -79,7 +73,7 @@ describe("apiUsageService", () => {
 
   it("should log a rate limit hit safely", async () => {
     await logRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "claude-web",
       provider: "claude",
       endpoint: "/v1/chat/completions",
@@ -92,7 +86,7 @@ describe("apiUsageService", () => {
 
   it("should list usage logs and generate summary", async () => {
     const log1 = await createUsageStart({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "chatgpt-web",
       provider: "chatgpt",
       endpoint: "/v1",
@@ -104,7 +98,7 @@ describe("apiUsageService", () => {
     await completeUsageSuccess(log1.id, { outputCharCount: 200, durationMs: 1000 });
 
     const log2 = await createUsageStart({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "chatgpt-web",
       provider: "chatgpt",
       endpoint: "/v1",
@@ -144,7 +138,7 @@ describe("apiUsageService", () => {
   it("aggregates provider-limit hits by provider, model, and safe API key display", async () => {
     const key = await prisma.internalApiKey.create({
       data: {
-        userId: "test-user-usage", workspaceId: "test-ws",
+        userId: "test-user-usage",
         name: "OpenWebUI",
         keyPrefix: "uai_live_safe",
         keyLast4: "1234",
@@ -179,7 +173,7 @@ describe("apiUsageService", () => {
     await createProviderLimitLog({ provider: "gemini", model: "gemini-web" });
     await prisma.internalApiUsageLog.create({
       data: {
-        userId: "test-user-usage", workspaceId: "test-ws",
+        userId: "test-user-usage",
         model: "gemini-web",
         provider: "gemini",
         endpoint: "/v1/chat/completions",
@@ -194,7 +188,7 @@ describe("apiUsageService", () => {
     });
     await prisma.internalApiUsageLog.create({
       data: {
-        userId: "test-user-usage", workspaceId: "test-ws",
+        userId: "test-user-usage",
         model: "gemini-web",
         provider: "gemini",
         endpoint: "/v1/chat/completions",
@@ -224,7 +218,7 @@ describe("apiUsageService", () => {
 
   it("logs internal provider-limit hits with safe metadata only", async () => {
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "chatgpt",
       modelId: "chatgpt-web",
       source: "internal_chat",
@@ -232,7 +226,7 @@ describe("apiUsageService", () => {
     });
 
     const record = await prisma.internalApiUsageLog.findFirst({
-      where: { userId: "test-user-usage", workspaceId: "test-ws", errorCode: "provider_rate_limit_exceeded" }
+      where: { userId: "test-user-usage", errorCode: "provider_rate_limit_exceeded" }
     });
     expect(record).toMatchObject({
       apiKeyId: null,
@@ -256,7 +250,7 @@ describe("apiUsageService", () => {
   it("logs OpenAI provider-limit hits with safe API key display", async () => {
     const key = await prisma.internalApiKey.create({
       data: {
-        userId: "test-user-usage", workspaceId: "test-ws",
+        userId: "test-user-usage",
         name: "OpenWebUI",
         keyPrefix: "uai_live_safe",
         keyLast4: "1234",
@@ -265,7 +259,7 @@ describe("apiUsageService", () => {
       }
     });
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "claude",
       modelId: "claude-web",
       source: "openai_compat",
@@ -276,7 +270,7 @@ describe("apiUsageService", () => {
     });
 
     const record = await prisma.internalApiUsageLog.findFirst({
-      where: { userId: "test-user-usage", workspaceId: "test-ws", provider: "claude" }
+      where: { userId: "test-user-usage", provider: "claude" }
     });
     expect(record).toMatchObject({
       apiKeyId: key.id,
@@ -290,7 +284,7 @@ describe("apiUsageService", () => {
 
   it("updates an existing OpenAI usage start when provider limit is hit", async () => {
     const start = await createUsageStart({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       model: "gemini-web",
       provider: "gemini",
       endpoint: "/v1/chat/completions",
@@ -301,7 +295,7 @@ describe("apiUsageService", () => {
     });
 
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "gemini",
       modelId: "gemini-web",
       source: "openai_compat",
@@ -321,19 +315,19 @@ describe("apiUsageService", () => {
 
   it("aggregates provider-limit hits by source", async () => {
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "chatgpt",
       source: "internal_chat",
       limitPerMinute: 20
     });
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "chatgpt",
       source: "internal_multi_chat",
       limitPerMinute: 20
     });
     await logProviderRateLimitHit({
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       provider: "chatgpt",
       source: "openai_compat",
       limitPerMinute: 20
@@ -356,7 +350,7 @@ async function createProviderLimitLog(input: {
 }) {
   return prisma.internalApiUsageLog.create({
     data: {
-      userId: "test-user-usage", workspaceId: "test-ws",
+      userId: "test-user-usage",
       apiKeyId: input.apiKeyId,
       apiKeyPrefix: input.apiKeyPrefix,
       model: input.model,

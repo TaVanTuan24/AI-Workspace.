@@ -29,7 +29,6 @@ export function redactSecrets(input: string, env?: ApiEnv): string {
   // Redact known environment secrets if env is provided
   if (env) {
     const secretsToRedact = [
-      env.WORKSPACE_INVITE_SMTP_PASSWORD,
       env.INTERNAL_API_KEY,
       env.API_KEY_HASH_SECRET
     ].filter((s): s is string => typeof s === "string" && s.length > 0);

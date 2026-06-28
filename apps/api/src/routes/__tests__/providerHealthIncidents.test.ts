@@ -7,34 +7,8 @@ import { randomUUID } from "node:crypto";
 
 vi.mock("../../middleware/auth.js", () => ({
   attachLocalUser: async (request: any) => {
-    request.user = { id: request.headers["x-local-user-id"] || "test-user-id", email: "test@example.com" };
+    request.user = { id: request.headers["x-local-user-id"] || "test-user-id", email: "test@example.com", role: "owner" };
   }
-}));
-
-vi.mock("../../auth/workspaceContext.js", () => ({
-  getWorkspaceContextForRequest: vi.fn(async (request: any) => {
-    if (!request.user) return null;
-    return {
-      userId: request.user.id,
-      workspaceId: "default",
-      membershipId: "test-membership-id",
-      role: request.user.role || "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-  }),
-  requireWorkspaceContext: vi.fn(async (request: any, reply: any) => {
-    if (!request.user) {
-      reply.code(401).send({ error: "Unauthorized" });
-      return null;
-    }
-    return {
-      userId: request.user.id,
-      workspaceId: "default",
-      membershipId: "test-membership-id",
-      role: request.user.role || "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-  })
 }));
 
 const runId = makeTestRunId("incidentRoutes");

@@ -8,7 +8,7 @@ export async function settingsOverviewRoutes(app: FastifyInstance) {
 
   app.get("/settings/overview", async (request, reply) => {
     if (!(await requirePermission(request, reply, "settings.read"))) return;
-    const overview = await getSettingsOverview(request.user.id, request.user, request.workspaceContext);
+    const overview = await getSettingsOverview(request.user.id, request.user);
     return reply.send(overview);
   });
 }

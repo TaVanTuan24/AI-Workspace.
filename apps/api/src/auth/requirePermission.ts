@@ -16,25 +16,16 @@ declare module "fastify" {
   }
 }
 
-import { getWorkspaceContextForRequest } from "./workspaceContext.js";
-
 export async function resolveWorkspaceRole(request: FastifyRequest): Promise<WorkspaceRole | null> {
   if (request.workspaceRole) return request.workspaceRole;
   if (!request.user?.id) return null;
 
-  try {
-    const ctx = await getWorkspaceContextForRequest(request);
-    if (!ctx) return null;
-
-    request.workspaceRole = ctx.role;
-    request.workspacePermissions = ctx.permissions;
-    return ctx.role;
-  } catch (err: any) {
-    if (err.message === "workspace_required") {
-      return null; // The require*Permission functions will send 401, but we should return a specific value if we want 403.
-    }
-    throw err;
-  }
+  // Single-user/self-host: the role lives on the user (set by attachLocalUser),
+  // there is no per-workspace membership to resolve.
+  const role = normalizeWorkspaceRole(request.user.role);
+  request.workspaceRole = role;
+  request.workspacePermissions = getPermissionsForRole(role);
+  return role;
 }
 
 export async function requirePermission(

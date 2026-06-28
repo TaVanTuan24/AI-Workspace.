@@ -17,11 +17,8 @@ import {
   hasPermission,
   permissionDeniedMessage,
   type WorkspaceNotification,
-  type WorkspacePermission,
-  getWorkspaceQuotaSummary,
-  type WorkspaceUsageSummary
+  type WorkspacePermission
 } from "../../../lib/api";
-import { AlertTriangle } from "lucide-react";
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -51,7 +48,6 @@ export default function ApiKeysPage() {
   const [editRateLimit, setEditRateLimit] = useState<string>("30");
   const [isSavingRateLimit, setIsSavingRateLimit] = useState(false);
 
-  const [quotaSummary, setQuotaSummary] = useState<WorkspaceUsageSummary | null>(null);
 
   useEffect(() => {
     loadData();
@@ -61,18 +57,16 @@ export default function ApiKeysPage() {
     try {
       setLoading(true);
       setError("");
-      const [keysRes, modelsRes, notificationRes, overviewRes, quotaData] = await Promise.all([
+      const [keysRes, modelsRes, notificationRes, overviewRes] = await Promise.all([
         apiGetApiKeys(),
         apiGetModelPreferences().catch(() => ({ models: [] })),
         getWorkspaceNotifications().catch(() => ({ notifications: [] })),
-        getSettingsOverview(),
-        getWorkspaceQuotaSummary().catch(() => null)
+        getSettingsOverview()
       ]);
       setKeys(keysRes.keys);
       setAllModels(modelsRes.models);
       setNotifications(notificationRes.notifications);
       setPermissions(overviewRes.currentUser.permissions);
-      setQuotaSummary(quotaData);
     } catch (err: any) {
       setError(err.message || "Failed to load data");
     } finally {
@@ -230,12 +224,6 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      {quotaSummary && quotaSummary.quotas.find(q => q.resource === "apiKeys" && q.exceeded) && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Workspace API key limit reached. <a href="/settings/quota" className="underline hover:text-red-200 ml-1">View quotas</a></span>
-        </div>
-      )}
 
       {noUsableProviderWarning && (
         <div className="bg-amber-500/10 text-amber-300 p-4 rounded-lg border border-amber-500/20">
@@ -353,7 +341,7 @@ export default function ApiKeysPage() {
           </div>
           <button 
             onClick={handleCreate}
-            disabled={isCreating || !newName.trim() || !canWriteApiKeys || !!(quotaSummary && quotaSummary.quotas.find(q => q.resource === "apiKeys" && q.exceeded))}
+            disabled={isCreating || !newName.trim() || !canWriteApiKeys}
             className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium transition-colors h-[42px]"
           >
             Create Key

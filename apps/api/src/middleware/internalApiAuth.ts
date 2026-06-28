@@ -24,9 +24,6 @@ export async function internalApiAuth(request: FastifyRequest, reply: FastifyRep
     if (dbKey) {
       // Attach local user context so job ownership works
       await attachLocalUser(request);
-      if (dbKey.workspaceId) {
-        request.user.workspaceId = dbKey.workspaceId;
-      }
       request.apiKeyId = dbKey.keyId;
       request.apiKeyPrefix = dbKey.keyPrefix;
       request.rateLimitPerMinute = dbKey.rateLimitPerMinute;

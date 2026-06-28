@@ -40,8 +40,7 @@ export async function internalApiRateLimit(request: FastifyRequest, reply: Fasti
       
       await logRateLimitHit({
         userId: request.user.id,
-workspaceId: request.user.workspaceId!,
-apiKeyId: request.apiKeyId,
+        apiKeyId: request.apiKeyId,
         apiKeyPrefix: request.apiKeyPrefix,
         model,
         provider,

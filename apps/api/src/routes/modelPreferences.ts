@@ -39,7 +39,7 @@ export async function modelPreferenceRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "Invalid request body" });
     }
 
-    const updated = await updateModelPreferences(request.user.id, request.user.workspaceId!, parsed.data);
+    const updated = await updateModelPreferences(request.user.id, parsed.data);
     return reply.send(updated);
   });
 }

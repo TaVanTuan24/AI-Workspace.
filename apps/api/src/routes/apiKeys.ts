@@ -27,7 +27,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   app.get("/settings/api-keys", async (request, reply) => {
     if (!(await requirePermission(request, reply, "apiKeys.read"))) return;
-    const keys = await listApiKeys(request.user.id, request.user.workspaceId!);
+    const keys = await listApiKeys(request.user.id);
     return reply.send({ keys });
   });
 
@@ -36,7 +36,6 @@ export async function apiKeyRoutes(app: FastifyInstance) {
     const { name, allowedModelIds, rateLimitPerMinute } = createApiKeyBody.parse(request.body);
     const { rawKey, record } = await createApiKey({
       userId: request.user.id,
-      workspaceId: request.user.workspaceId!,
       name,
       allowedModelIds,
       rateLimitPerMinute
@@ -50,7 +49,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
   app.post("/settings/api-keys/:id/revoke", async (request, reply) => {
     if (!(await requirePermission(request, reply, "apiKeys.write"))) return;
     const { id } = keyIdParam.parse(request.params);
-    await revokeApiKey(request.user.id, request.user.workspaceId!, id);
+    await revokeApiKey(request.user.id, id);
     return reply.send({ ok: true });
   });
 
@@ -59,7 +58,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
     const { id } = keyIdParam.parse(request.params);
     try {
       const preserveScopes = request.body?.preserveScopes ?? true;
-      const { rawKey, record } = await rotateApiKey(request.user.id, request.user.workspaceId!, id, preserveScopes);
+      const { rawKey, record } = await rotateApiKey(request.user.id, id, preserveScopes);
       return reply.send({
         key: record,
         rawKey
@@ -81,7 +80,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid request body" });
       }
 
-      const key = await setApiKeyModelScopes(request.user.id, request.user.workspaceId!, request.params.id, parsed.data.allowedModelIds);
+      const key = await setApiKeyModelScopes(request.user.id, request.params.id, parsed.data.allowedModelIds);
       return reply.send({ key });
     } catch (error: any) {
       return reply.code(400).send({ error: error.message });
@@ -100,7 +99,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid request body" });
       }
 
-      const key = await updateApiKeyRateLimit(request.user.id, request.user.workspaceId!, request.params.id, parsed.data.rateLimitPerMinute);
+      const key = await updateApiKeyRateLimit(request.user.id, request.params.id, parsed.data.rateLimitPerMinute);
       return reply.send({ key });
     } catch (error: any) {
       return reply.code(400).send({ error: error.message });

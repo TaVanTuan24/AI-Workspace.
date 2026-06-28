@@ -8,7 +8,6 @@ import { attachLocalUser } from "../middleware/auth.js";
 import { prisma } from "../services/prisma.js";
 import { browserManager } from "../services/browserManager.js";
 import { providerRegistry } from "../services/providerRegistry.js";
-import { assertWorkspaceQuota } from "../services/workspaceQuotaService.js";
 
 const providerParams = z.object({
   provider: z.enum(PROVIDERS)
@@ -68,24 +67,10 @@ export async function providerRoutes(app: FastifyInstance) {
       });
     }
 
-    const existingConnection = await prisma.providerConnection.findUnique({
-      where: { userId_provider: { userId: request.user.id, provider } }
-    });
-
-    if (!existingConnection) {
-      await assertWorkspaceQuota({
-        workspaceId: request.user.workspaceId!,
-        resource: 'providerConnections',
-        actorUserId: request.user.id,
-        source: 'provider_connection_create'
-      });
-    }
-
     await prisma.providerConnection.upsert({
       where: { userId_provider: { userId: request.user.id, provider } },
       create: {
         userId: request.user.id,
-        workspaceId: request.user.workspaceId!,
         provider,
         status: "connecting",
         browserProfileId: `${request.user.id}_${provider}`
@@ -286,7 +271,6 @@ export async function providerRoutes(app: FastifyInstance) {
       where: { userId_provider: { userId: request.user.id, provider } },
       create: {
         userId: request.user.id,
-        workspaceId: request.user.workspaceId!,
         provider,
         status: "disconnected"
       },

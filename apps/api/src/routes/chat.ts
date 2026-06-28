@@ -17,7 +17,6 @@ import {
   ProviderRateLimitExceededError
 } from "../services/providerRateLimitService.js";
 import { logProviderRateLimitHit, modelIdForProvider } from "../services/apiUsageService.js";
-import { assertWorkspaceQuota } from "../services/workspaceQuotaService.js";
 import {
   createAttachment,
   resolveOwnedAttachmentIds,
@@ -90,15 +89,6 @@ export async function chatRoutes(app: FastifyInstance) {
   app.post("/chat", async (request, reply) => {
     const body = chatBody.parse(request.body);
 
-    if (request.user.workspaceId) {
-      await assertWorkspaceQuota({
-        workspaceId: request.user.workspaceId,
-        resource: 'monthlyApiRequests',
-        actorUserId: request.user.id,
-        source: 'internal_chat'
-      });
-    }
-
     const providerCheck = await validateRunnableProvider(request.user.id, body.provider);
     if (!providerCheck.ok) {
       const status = providerCheck.error.errorCode === "PROVIDER_NOT_READY" ? 501 : 409;
@@ -111,9 +101,8 @@ export async function chatRoutes(app: FastifyInstance) {
       if (error instanceof ProviderRateLimitExceededError) {
         await logProviderRateLimitHit({
           userId: request.user.id,
-workspaceId: request.user.workspaceId!,
-provider: providerCheck.provider,
-modelId: modelIdForProvider(providerCheck.provider),
+          provider: providerCheck.provider,
+          modelId: modelIdForProvider(providerCheck.provider),
           source: "internal_chat",
           limitPerMinute: error.check.limit
         });
@@ -204,16 +193,6 @@ provider: providerCheck.provider,
     const body = multiChatBody.parse(request.body);
     const providers = [...new Set(body.providers)];
 
-    if (request.user.workspaceId) {
-      await assertWorkspaceQuota({
-        workspaceId: request.user.workspaceId,
-        resource: 'monthlyApiRequests',
-        incrementBy: providers.length,
-        actorUserId: request.user.id,
-        source: 'internal_multi_chat'
-      });
-    }
-
     const checks = await Promise.all(
       providers.map(async (provider) => validateRunnableProvider(request.user.id, provider))
     );
@@ -232,7 +211,6 @@ provider: providerCheck.provider,
           if (error instanceof ProviderRateLimitExceededError) {
             await logProviderRateLimitHit({
           userId: request.user.id,
-          workspaceId: request.user.workspaceId!,
           provider: item.provider,
               modelId: modelIdForProvider(item.provider),
               source: "internal_multi_chat",
@@ -533,9 +511,8 @@ provider: providerCheck.provider,
       if (error instanceof ProviderRateLimitExceededError) {
         await logProviderRateLimitHit({
           userId: request.user.id,
-workspaceId: request.user.workspaceId!,
-provider: providerCheck.provider,
-modelId: modelIdForProvider(providerCheck.provider),
+          provider: providerCheck.provider,
+          modelId: modelIdForProvider(providerCheck.provider),
           source: "internal_retry",
           limitPerMinute: error.check.limit
         });

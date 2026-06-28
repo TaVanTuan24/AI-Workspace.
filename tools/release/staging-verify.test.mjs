@@ -30,12 +30,6 @@ describe("staging-verify", () => {
       if (req.url === "/settings/overview") return json(res, 200, { providers: [] });
       if (req.url === "/settings/provider-health/incidents?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/provider-health/diagnostics-runs?limit=10") return json(res, 200, { data: [] });
-      if (req.url === "/settings/workspace/admin-overview") return json(res, 200, { overview: {} });
-      if (req.url === "/settings/workspace/activity") return json(res, 200, { data: [] });
-      if (req.url === "/settings/workspace/schedulers") return json(res, 200, { schedulers: [] });
-      if (req.url === "/settings/workspace/quota") return json(res, 200, { quota: {} });
-      if (req.url === "/settings/workspace/quota/report") return json(res, 200, { report: {} });
-      if (req.url === "/settings/workspace/invites/email-delivery-status") return json(res, 200, { stats: {} });
 
       return json(res, 404, { error: "not found" });
     });

@@ -17,13 +17,7 @@ const FORBIDDEN_RESPONSE_KEYS = [
 const SAFE_SETTINGS_ENDPOINTS = [
   "/settings/overview",
   "/settings/provider-health/incidents?limit=10",
-  "/settings/provider-health/diagnostics-runs?limit=10",
-  "/settings/workspace/admin-overview",
-  "/settings/workspace/activity",
-  "/settings/workspace/schedulers",
-  "/settings/workspace/quota",
-  "/settings/workspace/quota/report",
-  "/settings/workspace/invites/email-delivery-status"
+  "/settings/provider-health/diagnostics-runs?limit=10"
 ];
 
 export function parseArgs(argv) {

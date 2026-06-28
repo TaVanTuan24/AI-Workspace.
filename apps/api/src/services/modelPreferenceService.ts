@@ -92,7 +92,6 @@ export async function getModelPreferences(userId: string): Promise<{
 
 export async function updateModelPreferences(
   userId: string,
-  workspaceId: string,
   input: UpdateModelPreferencesInput
 ): Promise<{ models: ModelPreferenceView[]; autoSelectFirstUsable: boolean }> {
   // Update or create UserSettings
@@ -117,7 +116,6 @@ export async function updateModelPreferences(
       },
       create: {
         userId,
-        workspaceId,
         modelId: m.modelId,
         provider,
         enabled: m.enabled,
@@ -134,7 +132,7 @@ export async function updateModelPreferences(
   return getModelPreferences(userId);
 }
 
-export async function setDefaultModel(userId: string, workspaceId: string, modelId: string): Promise<void> {
+export async function setDefaultModel(userId: string, modelId: string): Promise<void> {
   const current = await getModelPreferences(userId);
   const updatedModels = current.models.map(m => ({
     modelId: m.modelId,
@@ -144,7 +142,7 @@ export async function setDefaultModel(userId: string, workspaceId: string, model
     selectedSubModelId: m.selectedSubModelId
   }));
 
-  await updateModelPreferences(userId, workspaceId, {
+  await updateModelPreferences(userId, {
     autoSelectFirstUsable: current.autoSelectFirstUsable,
     models: updatedModels
   });

@@ -2,17 +2,13 @@ import {
   Activity,
   Bell,
   Cable,
-  CalendarClock,
-  ClipboardList,
   DatabaseBackup,
   Gauge,
   KeyRound,
   LayoutDashboard,
   Shield,
   SlidersHorizontal,
-  TimerReset,
-  UsersRound,
-  PieChart
+  TimerReset
 } from "lucide-react";
 
 export const settingsNavItems = [
@@ -21,20 +17,6 @@ export const settingsNavItems = [
     label: "Overview",
     description: "Workspace status",
     icon: LayoutDashboard
-  },
-  {
-    href: "/settings/workspace-overview",
-    label: "Admin Overview",
-    description: "Consolidated admin status",
-    icon: ClipboardList,
-    permission: "settings.read"
-  },
-  {
-    href: "/settings/activity",
-    label: "Activity",
-    description: "Unified timeline",
-    icon: Activity,
-    permission: "settings.read"
   },
   {
     href: "/settings/connections",
@@ -79,13 +61,6 @@ export const settingsNavItems = [
     icon: Activity
   },
   {
-    href: "/settings/users",
-    label: "Users & Roles",
-    description: "Admin boundaries",
-    icon: UsersRound,
-    permission: "users.read"
-  },
-  {
     href: "/settings/conversations",
     label: "Conversations",
     description: "Exports and imports",
@@ -96,20 +71,5 @@ export const settingsNavItems = [
     label: "Security",
     description: "Local privacy controls",
     icon: Shield
-  },
-  {
-    href: "/settings/quota",
-    label: "Quota & Limits",
-    description: "Resource usage",
-    icon: PieChart,
-    permission: "settings.read"
-  },
-  {
-    href: "/settings/schedulers",
-    label: "Schedulers",
-    description: "Background job status",
-    icon: CalendarClock,
-    permission: "settings.read"
   }
 ] as const;
-

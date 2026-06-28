@@ -162,7 +162,7 @@ API_KEY_HASH_SECRET=your_secure_hash_secret
 Then run `prisma migrate dev` and manage keys at `/settings/api-keys`. Raw keys are shown once on creation; only HMAC-SHA256 hashes are stored. Keys can be created, rotated, and revoked.
 
 - **Per-key model scopes** — restrict a key to specific models. Empty scope = all globally enabled models. A globally disabled model overrides any key scope. Disallowed models are hidden from `GET /v1/models` and rejected with `model_not_allowed_for_key`.
-- **Per-key rate limits** — set a custom requests/minute or inherit the workspace default at `/settings/api-keys`.
+- **Per-key rate limits** — set a custom requests/minute or inherit the system default at `/settings/api-keys`.
 - **Provider rate limits** — cap browser automation per user/provider before a job is enqueued, configurable at `/settings/provider-rate-limits`. Exceeding any limit returns HTTP 429 with an OpenAI-compatible `rate_limit_exceeded` error.
 
 Key env defaults:
@@ -192,10 +192,6 @@ Central configuration at `/settings`, with overview cards (provider readiness, m
 | `/settings/provider-rate-limits` | Per-provider request throttles. |
 | `/settings/notifications` | In-app alert preferences and notification history. |
 | `/settings/conversations` | Export/import chat history (plain or encrypted). |
-| `/settings/quota` | Workspace quota configuration and events. |
-| `/settings/activity` | Workspace activity log. |
-| `/settings/schedulers` | Background scheduler status. |
-| `/settings/users` | Local users and roles (owner only for role changes). |
 | `/settings/security` | Security controls. |
 
 The hub loads only safe operational metadata. Opening it does not start browser automation, refresh health, send prompts, or expose secrets/sessions.
@@ -247,14 +243,11 @@ At `/settings/conversations`:
 
 ---
 
-## 12. Workspaces, roles, and invites
+## 12. Roles and permissions
 
-The app runs single-workspace by default; the default Local Workspace handles users without an explicit assignment. Multi-workspace support is available:
+The app is single-user and local-first. The local user is provisioned automatically as `owner` on first request.
 
-- **Roles** (`User.role`): `owner` and `admin` (full admin), `member` (read-oriented), `viewer` (read-only). Existing/local users default to `owner`. Backend permission guards are the source of truth; the UI only mirrors them. Denials return `{ "error": "permission_denied" }`.
-- **User management** (`/settings/users`) — owners can list users, review role-audit events, and change roles. The last owner cannot be demoted. User lists and audit events expose only safe fields (id, email, role, timestamps).
-- **Workspace switching/creation** — new workspaces start empty; no data is copied (no sessions, API keys, or settings). Switching reloads the UI to prevent cross-workspace leakage.
-- **Invites** — owner-only. Tokens are SHA-256 hashed at rest and shown once; they expire after 7 days with scheduled cleanup. Email delivery (`WORKSPACE_INVITE_EMAIL_PROVIDER`: `noop` / `console_dry_run` / `smtp`) is dry-run by default; real SMTP send requires explicit opt-in and is hard-blocked in tests.
+- **Roles** (`User.role`): `owner` and `admin` (full admin), `member` (read-oriented), `viewer` (read-only). Local users default to `owner`. Backend permission guards (`requirePermission`) are the source of truth; the UI only mirrors them. Denials return `{ "error": "permission_denied" }`.
 
 ---
 

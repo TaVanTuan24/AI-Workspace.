@@ -18,7 +18,6 @@ import {
   providerRateLimitHeaders,
   ProviderRateLimitExceededError
 } from "../services/providerRateLimitService.js";
-import { assertWorkspaceQuota } from "../services/workspaceQuotaService.js";
 
 const redisEvents = new RedisJobEventSubscriber();
 
@@ -114,26 +113,6 @@ export async function openaiCompatRoutes(app: FastifyInstance) {
       });
     }
 
-    try {
-      await assertWorkspaceQuota({
-        workspaceId: request.user.workspaceId!,
-        resource: 'monthlyApiRequests',
-        actorUserId: request.user.id,
-        source: 'openai_compat_chat'
-      });
-    } catch (error: any) {
-      if (error.code === 'workspace_quota_exceeded') {
-        return reply.code(403).send({
-          error: {
-            message: "Workspace quota exceeded for monthly API requests.",
-            type: "quota_exceeded",
-            code: "workspace_quota_exceeded"
-          }
-        });
-      }
-      throw error;
-    }
-
     const { model, messages, stream } = parsed.data;
 
     const messageCount = messages.length;
@@ -144,7 +123,6 @@ export async function openaiCompatRoutes(app: FastifyInstance) {
     
     const usageLog = await createUsageStart({
       userId: request.user.id,
-      workspaceId: request.user.workspaceId!,
       apiKeyId: request.apiKeyId,
       apiKeyPrefix: request.apiKeyPrefix,
       model,
@@ -194,7 +172,6 @@ export async function openaiCompatRoutes(app: FastifyInstance) {
       if (error instanceof ProviderRateLimitExceededError) {
         await logProviderRateLimitHit({
           userId: request.user.id,
-          workspaceId: request.user.workspaceId!,
           provider: modelDef.provider,
           modelId: model,
           source: "openai_compat",

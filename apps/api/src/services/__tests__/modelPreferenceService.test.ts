@@ -25,12 +25,6 @@ describe("modelPreferenceService", () => {
 
   beforeEach(async () => {
 
-    await prisma.workspace.upsert({
-      where: { id: "test-ws" },
-      update: {},
-      create: { id: "test-ws", name: "Test Workspace", slug: "test-ws-" + Math.random().toString(36).substring(7) }
-    });
-
     await scope.cleanup();
     await prisma.user.create({
       data: {
@@ -59,7 +53,7 @@ describe("modelPreferenceService", () => {
   });
 
   it("should save and retrieve user preferences", async () => {
-    await updateModelPreferences(userId, "test-ws", {
+    await updateModelPreferences(userId, {
       autoSelectFirstUsable: false,
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
@@ -83,7 +77,7 @@ describe("modelPreferenceService", () => {
   });
 
   it("should set default model correctly and clear others", async () => {
-    await updateModelPreferences(userId, "test-ws", {
+    await updateModelPreferences(userId, {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "chatgpt-web", enabled: true, isDefault: false, priority: 10 },
@@ -91,7 +85,7 @@ describe("modelPreferenceService", () => {
       ]
     });
 
-    await setDefaultModel(userId, "test-ws", "chatgpt-web");
+    await setDefaultModel(userId, "chatgpt-web");
 
     const prefs = await getModelPreferences(userId);
     const chatgpt = prefs.models.find(m => m.modelId === "chatgpt-web");
@@ -103,7 +97,7 @@ describe("modelPreferenceService", () => {
 
   it("should resolve default model with auto fallback", async () => {
     // gemini is default but not usable (from mock). autoSelectFirstUsable is true.
-    await updateModelPreferences(userId, "test-ws", {
+    await updateModelPreferences(userId, {
       autoSelectFirstUsable: true,
       models: [
         { modelId: "gemini-web", enabled: true, isDefault: true, priority: 10 },
@@ -119,7 +113,7 @@ describe("modelPreferenceService", () => {
 
   it("should not fallback if autoSelectFirstUsable is false", async () => {
     // gemini is default but not usable. autoSelectFirstUsable is false.
-    await updateModelPreferences(userId, "test-ws", {
+    await updateModelPreferences(userId, {
       autoSelectFirstUsable: false,
       models: [
         { modelId: "gemini-web", enabled: true, isDefault: true, priority: 10 },
