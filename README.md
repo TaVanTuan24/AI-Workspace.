@@ -89,10 +89,11 @@ The app never asks for the provider password and never bypasses verification. Us
 
 ## 4. Chat
 
-The `/chat` page supports two modes:
+The `/chat` page supports three modes:
 
 - **Single mode** — one prompt to one provider (`POST /chat`).
 - **Compare mode** — one prompt to multiple providers in parallel (`POST /chat/multi`). Each provider reports its own errors; one failure does not break the others.
+- **Discuss mode** — the selected providers discuss the topic **sequentially**, in the numbered speaking order. Each AI's reply is appended to a running transcript that is passed into the next AI's prompt, and the cycle repeats for the chosen number of rounds (1–10). Orchestrated client-side as a chain of single-provider turns (`POST /chat` with `saveHistory: false`); the running transcript is embedded in each turn's prompt since providers cannot see each other's accounts. A provider that fails is skipped and the discussion continues; **Stop** halts after the current turn. Discussion runs are live-only (not saved to history in this version).
 
 Chat runs through BullMQ and the worker; the API does not run browser automation directly. Responses stream to the UI over SSE (`GET /chat/:jobId/stream`).
 

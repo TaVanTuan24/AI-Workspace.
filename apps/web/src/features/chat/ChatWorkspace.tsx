@@ -25,7 +25,7 @@ import {
 } from "../../lib/api";
 import { filterVisibleNotifications, readDismissedNotifications, type DismissedNotificationMap } from "../../lib/notificationDismissals";
 
-export type Mode = "single" | "compare";
+export type Mode = "single" | "compare" | "discussion";
 type CardStatus =
   | "queued"
   | "started"
@@ -56,9 +56,50 @@ type Turn = {
   cards: Record<string, ResponseCardState>;
 };
 
+// One speaking turn in a sequential multi-AI discussion.
+type DiscussionEntry = {
+  id: string;
+  round: number;
+  provider: ProviderId;
+  displayName: string;
+  status: CardStatus;
+  text: string;
+  message?: string;
+};
+
 function newTurnId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `turn_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+}
+
+export function buildDiscussionPrompt(
+  topic: string,
+  transcript: Array<{ speaker: string; text: string }>,
+  speakerName: string
+): string {
+  if (transcript.length === 0) {
+    return [
+      `You are ${speakerName}, taking part in a structured discussion between several AI assistants.`,
+      "",
+      "Topic:",
+      `"""${topic}"""`,
+      "",
+      "You are speaking first. Open the discussion with your perspective in a few concise paragraphs."
+    ].join("\n");
+  }
+  const history = transcript.map((entry) => `### ${entry.speaker}\n${entry.text}`).join("\n\n");
+  return [
+    `You are ${speakerName}, taking part in a structured discussion between several AI assistants.`,
+    "",
+    "Topic:",
+    `"""${topic}"""`,
+    "",
+    "Discussion so far:",
+    "",
+    history,
+    "",
+    `As ${speakerName}, continue the discussion: respond to and build on the points above, add new insight, and note where you agree or disagree. Be concise and do not repeat what was already said.`
+  ].join("\n");
 }
 
 export function ChatWorkspace() {
@@ -76,6 +117,17 @@ export function ChatWorkspace() {
   const [mode, setMode] = useState<Mode>("single");
   const [selectedSingle, setSelectedSingle] = useState<ProviderId>("gemini");
   const [selectedCompare, setSelectedCompare] = useState<ProviderId[]>(["gemini", "chatgpt", "claude"]);
+  // Discussion mode: ordered participants (order = speaking order), round count,
+  // the running transcript, and a run/abort flag.
+  const [selectedDiscussion, setSelectedDiscussion] = useState<ProviderId[]>(["gemini", "chatgpt", "claude"]);
+  const [discussionRounds, setDiscussionRounds] = useState(2);
+  const [discussionEntries, setDiscussionEntries] = useState<DiscussionEntry[]>([]);
+  const [discussionRunning, setDiscussionRunning] = useState(false);
+  const [discussionError, setDiscussionError] = useState("");
+  const discussionAbortRef = useRef(false);
+  // Lets stopDiscussion force-resolve the in-flight step even if the worker
+  // never emits a terminal event (e.g. it is down), so the loop can unwind.
+  const activeStreamRef = useRef<{ finish: (status: CardStatus, message?: string) => void } | null>(null);
   const [prompt, setPrompt] = useState("");
   const [saveHistory, setSaveHistory] = useState(true);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -317,6 +369,164 @@ export function ChatWorkspace() {
     setAttachments([]);
     setUploadError("");
     setHistoryError("");
+  }
+
+  // Send one prompt to a single provider and resolve once the turn ends,
+  // streaming live updates via onUpdate. Used by the discussion orchestrator
+  // to run providers strictly one after another.
+  function streamPrompt(
+    provider: ProviderId,
+    promptText: string,
+    onUpdate: (text: string, status: CardStatus) => void
+  ): Promise<{ status: CardStatus; text: string; message?: string }> {
+    return new Promise((resolve) => {
+      void (async () => {
+        let started;
+        try {
+          started = await postChat({ provider, prompt: promptText, saveHistory: false });
+        } catch (error) {
+          resolve({ status: "requires_login", text: "", message: errorMessage(error) });
+          return;
+        }
+        const { jobId, streamUrl: path } = started;
+        const source = new EventSource(streamUrl(path));
+        sourcesRef.current.set(jobId, source);
+
+        let text = "";
+        let settled = false;
+        const finish = (status: CardStatus, message?: string) => {
+          if (settled) return;
+          settled = true;
+          activeStreamRef.current = null;
+          closeStream(jobId);
+          resolve({ status, text, message });
+        };
+        activeStreamRef.current = { finish };
+
+        const handleEvent = (event: MessageEvent) => {
+          let parsed: ProviderEvent;
+          try {
+            parsed = JSON.parse(event.data) as ProviderEvent;
+          } catch {
+            return;
+          }
+          switch (parsed.type) {
+            case "started":
+              onUpdate(text, "started");
+              break;
+            case "message_delta":
+              text += parsed.text;
+              onUpdate(text, "streaming");
+              break;
+            case "message_complete":
+              text = parsed.text;
+              onUpdate(text, "completed");
+              finish("completed");
+              break;
+            case "requires_login":
+            case "manual_action_required":
+            case "rate_limited":
+            case "timeout":
+            case "cancelled":
+            case "error":
+              finish(parsed.type, parsed.message);
+              break;
+            case "done":
+              finish(text ? "completed" : "error", text ? undefined : "No response was produced.");
+              break;
+            default:
+              break;
+          }
+        };
+
+        [
+          "started",
+          "message_delta",
+          "message_complete",
+          "requires_login",
+          "manual_action_required",
+          "rate_limited",
+          "cancelled",
+          "timeout",
+          "error",
+          "done"
+        ].forEach((type) => source.addEventListener(type, handleEvent));
+
+        source.onerror = () => {
+          if (text) finish("completed");
+          else finish("error", "The stream disconnected before the provider finished responding.");
+        };
+      })();
+    });
+  }
+
+  async function runDiscussion() {
+    const topic = prompt.trim();
+    const participants = selectedDiscussion;
+    if (!topic || discussionRunning || participants.length === 0) return;
+
+    const rounds = Math.min(Math.max(Math.trunc(discussionRounds) || 1, 1), 10);
+    discussionAbortRef.current = false;
+    setDiscussionError("");
+    setDiscussionRunning(true);
+    setDiscussionEntries([]);
+    setPrompt("");
+
+    const transcript: Array<{ speaker: string; text: string }> = [];
+
+    try {
+      for (let round = 1; round <= rounds; round += 1) {
+        for (const provider of participants) {
+          if (discussionAbortRef.current) return;
+
+          const displayName = byProvider.get(provider)?.displayName ?? provider;
+          const entryId = newTurnId();
+          setDiscussionEntries((prev) => [
+            ...prev,
+            { id: entryId, round, provider, displayName, status: "queued", text: "" }
+          ]);
+
+          const updateEntry = (patch: Partial<DiscussionEntry>) =>
+            setDiscussionEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, ...patch } : e)));
+
+          const stepPrompt = buildDiscussionPrompt(topic, transcript, displayName);
+          const result = await streamPrompt(provider, stepPrompt, (text, status) =>
+            updateEntry({ text, status })
+          );
+
+          updateEntry({ status: result.status, text: result.text, message: result.message });
+
+          if (result.status === "completed" && result.text.trim()) {
+            transcript.push({ speaker: displayName, text: result.text.trim() });
+          }
+          // Non-fatal: a provider that fails is skipped; the discussion continues.
+        }
+      }
+    } catch (error) {
+      setDiscussionError(errorMessage(error));
+    } finally {
+      setDiscussionRunning(false);
+    }
+  }
+
+  async function stopDiscussion() {
+    discussionAbortRef.current = true;
+    // Best-effort: cancel any in-flight jobs server-side.
+    for (const [jobId] of sourcesRef.current) {
+      await cancelChatJob(jobId).catch(() => {});
+    }
+    // Force-resolve the awaited step so runDiscussion's loop unwinds even if the
+    // worker never sends a terminal event; finish() also closes the stream.
+    activeStreamRef.current?.finish("cancelled", "Discussion stopped.");
+    closeAllStreams();
+    setDiscussionRunning(false);
+    setDiscussionEntries((prev) =>
+      prev.map((e) =>
+        e.status === "queued" || e.status === "started" || e.status === "streaming"
+          ? { ...e, status: "cancelled", message: "Discussion stopped." }
+          : e
+      )
+    );
   }
 
   async function openThread(id: string) {
@@ -585,7 +795,7 @@ export function ChatWorkspace() {
       <aside className="rounded-md border border-border bg-panel p-4">
         <h1 className="text-lg font-semibold">Chat</h1>
 
-        <div className="mt-4 grid grid-cols-2 rounded-md border border-border p-1 text-sm">
+        <div className="mt-4 grid grid-cols-3 rounded-md border border-border p-1 text-sm">
           <button
             className={`rounded px-3 py-2 ${mode === "single" ? "bg-accent text-white" : "text-muted"}`}
             onClick={() => setMode("single")}
@@ -600,36 +810,67 @@ export function ChatWorkspace() {
           >
             Compare
           </button>
+          <button
+            className={`rounded px-3 py-2 ${mode === "discussion" ? "bg-accent text-white" : "text-muted"}`}
+            onClick={() => setMode("discussion")}
+            type="button"
+          >
+            Discuss
+          </button>
         </div>
 
         <div className="mt-4 space-y-2">
-          {providerList.map((provider) =>
-            mode === "single" ? (
+          {providerList.map((provider) => {
+            if (mode === "single") {
+              return (
+                <ProviderRow
+                  key={provider.provider}
+                  provider={provider}
+                  model={modelsByProvider.get(provider.provider)}
+                  checked={selectedSingle === provider.provider}
+                  type="radio"
+                  onChange={() => setSelectedSingle(provider.provider)}
+                />
+              );
+            }
+            if (mode === "compare") {
+              return (
+                <ProviderRow
+                  key={provider.provider}
+                  provider={provider}
+                  model={modelsByProvider.get(provider.provider)}
+                  checked={selectedCompare.includes(provider.provider)}
+                  type="checkbox"
+                  onChange={() =>
+                    setSelectedCompare((current) =>
+                      current.includes(provider.provider)
+                        ? current.filter((item) => item !== provider.provider)
+                        : [...current, provider.provider]
+                    )
+                  }
+                />
+              );
+            }
+            const order = selectedDiscussion.indexOf(provider.provider);
+            return (
               <ProviderRow
                 key={provider.provider}
                 provider={provider}
                 model={modelsByProvider.get(provider.provider)}
-                checked={selectedSingle === provider.provider}
-                type="radio"
-                onChange={() => setSelectedSingle(provider.provider)}
-              />
-            ) : (
-              <ProviderRow
-                key={provider.provider}
-                provider={provider}
-                model={modelsByProvider.get(provider.provider)}
-                checked={selectedCompare.includes(provider.provider)}
+                checked={order >= 0}
                 type="checkbox"
+                orderLabel={order >= 0 ? String(order + 1) : undefined}
+                disabled={discussionRunning}
                 onChange={() =>
-                  setSelectedCompare((current) =>
+                  setSelectedDiscussion((current) =>
                     current.includes(provider.provider)
                       ? current.filter((item) => item !== provider.provider)
                       : [...current, provider.provider]
                   )
                 }
               />
-            )
-          )}
+            );
+          })}
         </div>
 
         {fallbackNotice ? (
@@ -678,12 +919,75 @@ export function ChatWorkspace() {
 
         <textarea
           className="mt-4 min-h-44 w-full resize-y rounded-md border border-border p-3 text-sm outline-none focus:border-accent"
-          placeholder={threadId && turns.length > 0 ? "Continue the conversation…" : "Say hello in one short sentence."}
+          placeholder={
+            mode === "discussion"
+              ? "Enter a topic for the AIs to discuss…"
+              : threadId && turns.length > 0
+                ? "Continue the conversation…"
+                : "Say hello in one short sentence."
+          }
           value={prompt}
           maxLength={20_000}
+          disabled={discussionRunning}
           onChange={(event) => setPrompt(event.target.value)}
         />
 
+        {mode === "discussion" ? (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <label className="text-muted" htmlFor="discussion-rounds">Rounds</label>
+              <input
+                id="discussion-rounds"
+                type="number"
+                min={1}
+                max={10}
+                value={discussionRounds}
+                disabled={discussionRunning}
+                onChange={(event) => setDiscussionRounds(Number(event.target.value))}
+                className="h-9 w-20 rounded-md border border-border bg-surface px-2 text-sm outline-none focus:border-accent disabled:opacity-50"
+              />
+              <span className="text-xs text-muted">
+                {selectedDiscussion.length} participant{selectedDiscussion.length === 1 ? "" : "s"}, in the numbered order
+              </span>
+            </div>
+            {discussionError ? <div className="mt-2 text-xs text-red-500">{discussionError}</div> : null}
+            <div className="mt-3 flex gap-2">
+              {discussionRunning ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface"
+                  onClick={() => void stopDiscussion()}
+                >
+                  <Square className="h-4 w-4" />
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={!prompt.trim() || selectedDiscussion.length === 0}
+                  onClick={() => void runDiscussion()}
+                >
+                  <Send className="h-4 w-4" />
+                  Start discussion
+                </button>
+              )}
+              <button
+                title="Clear discussion"
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
+                disabled={discussionRunning || discussionEntries.length === 0}
+                onClick={() => {
+                  setDiscussionEntries([]);
+                  setDiscussionError("");
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         {attachments.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {attachments.map((file) => (
@@ -764,10 +1068,14 @@ export function ChatWorkspace() {
             <X className="h-4 w-4" />
           </button>
         </div>
+          </>
+        )}
       </aside>
 
       <section className="space-y-6">
-        {turns.length === 0 ? (
+        {mode === "discussion" ? (
+          <DiscussionTranscript entries={discussionEntries} running={discussionRunning} />
+        ) : turns.length === 0 ? (
           <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted">
             Send a prompt to start. Follow-up messages continue the same provider conversation.
           </div>
@@ -864,24 +1172,39 @@ export function ProviderRow({
   model,
   checked,
   type,
-  onChange
+  onChange,
+  orderLabel,
+  disabled = false
 }: {
   provider: ProviderConnectionSummary;
   model?: Awaited<ReturnType<typeof apiGetModelPreferences>>["models"][number];
   checked: boolean;
   type: "radio" | "checkbox";
   onChange: () => void;
+  orderLabel?: string;
+  disabled?: boolean;
 }) {
   const chatReady = provider.capabilities.includes("send_message") && provider.readiness === "ready";
   return (
-    <label className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-      <span>
-        <span className="block font-medium">{provider.displayName}</span>
-        <span className="text-xs text-muted">
-          {provider.status} · {chatReady ? "chat-ready" : provider.readiness}
+    <label
+      className={`flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm ${
+        disabled ? "opacity-60" : ""
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        {orderLabel ? (
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white">
+            {orderLabel}
+          </span>
+        ) : null}
+        <span>
+          <span className="block font-medium">{provider.displayName}</span>
+          <span className="text-xs text-muted">
+            {provider.status} · {chatReady ? "chat-ready" : provider.readiness}
+          </span>
         </span>
       </span>
-      <input type={type} checked={checked} onChange={onChange} />
+      <input type={type} checked={checked} onChange={onChange} disabled={disabled} />
     </label>
   );
 }
@@ -1081,6 +1404,57 @@ function HistoryRow({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function DiscussionTranscript({ entries, running }: { entries: DiscussionEntry[]; running: boolean }) {
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted">
+        Enter a topic, pick participants (they speak in the numbered order), set the number of rounds, then
+        <span className="font-medium"> Start discussion</span>. Each AI sees the previous replies and builds on them.
+      </div>
+    );
+  }
+  let lastRound = 0;
+  return (
+    <div className="space-y-4">
+      {entries.map((entry) => {
+        const showRound = entry.round !== lastRound;
+        lastRound = entry.round;
+        return (
+          <div key={entry.id} className="space-y-2">
+            {showRound ? (
+              <div className="flex items-center gap-3 pt-2 text-xs font-medium uppercase tracking-wide text-muted">
+                <span className="h-px flex-1 bg-border" />
+                Round {entry.round}
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            ) : null}
+            <article className="rounded-md border border-border bg-panel p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold">{entry.displayName}</h2>
+                <span className="rounded-md bg-surface px-2 py-1 text-xs text-muted">{entry.status}</span>
+              </div>
+              {entry.message ? (
+                <div className="mt-3 rounded-md border border-warn/40 bg-amber-50 p-3 text-sm text-amber-950">
+                  {entry.message}
+                </div>
+              ) : null}
+              <pre className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
+                {entry.text ||
+                  (entry.status === "queued"
+                    ? "Waiting…"
+                    : entry.status === "started" || entry.status === "streaming"
+                      ? "…"
+                      : "No response yet.")}
+              </pre>
+            </article>
+          </div>
+        );
+      })}
+      {running ? <div className="text-center text-xs text-muted">Discussion in progress…</div> : null}
     </div>
   );
 }
