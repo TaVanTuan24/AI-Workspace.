@@ -17,19 +17,6 @@ vi.mock("../services/prisma.js", () => ({
   }
 }));
 
-vi.mock("./workspaceContext.js", () => ({
-  getWorkspaceContextForRequest: vi.fn(async (request: any) => {
-    if (!request.user) return null;
-    return {
-      userId: request.user.id,
-      workspaceId: request.user.workspaceId || "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: request.user.role || "viewer",
-      permissions: []
-    };
-  })
-}));
-
 describe("requirePermission", () => {
   it("allows owner/admin roles", async () => {
     const app = Fastify();

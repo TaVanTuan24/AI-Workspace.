@@ -18,10 +18,6 @@ vi.mock("../../services/prisma.js", () => ({
   }
 }));
 
-vi.mock("../../services/workspaceService.js", () => ({
-  ensureDefaultWorkspace: vi.fn().mockResolvedValue({ id: "mock-workspace-id" })
-}));
-
 describe("OpenAI Compat Errors", () => {
   it("maps REQUIRES_LOGIN to provider_error", () => {
     const result = mapInternalErrorToOpenAI("REQUIRES_LOGIN", "Please reconnect.");

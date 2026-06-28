@@ -24,34 +24,6 @@ vi.mock("../../middleware/auth.js", () => ({
   })
 }));
 
-vi.mock("../../auth/workspaceContext.js", () => ({
-  getWorkspaceContextForRequest: vi.fn(async (request: any) => {
-    if (!request.user) return null;
-    request.workspaceContext = {
-      userId: request.user.id,
-      workspaceId: "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: request.user.role,
-      permissions: state.permissions || []
-    };
-    return request.workspaceContext;
-  }),
-  requireWorkspaceContext: vi.fn(async (request: any, reply: any) => {
-    if (!request.user) {
-      reply.code(401).send({ error: "Unauthorized" });
-      return null;
-    }
-    request.workspaceContext = {
-      userId: request.user.id,
-      workspaceId: "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: request.user.role,
-      permissions: state.permissions || []
-    };
-    return request.workspaceContext;
-  })
-}));
-
 vi.mock("../../services/prisma.js", () => ({
   prisma: {
     user: { findUnique: vi.fn() },

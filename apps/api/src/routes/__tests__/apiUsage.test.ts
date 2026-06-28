@@ -5,34 +5,8 @@ import { getProviderLimitAnalytics } from "../../services/apiUsageService.js";
 
 vi.mock("../../middleware/auth.js", () => ({
   attachLocalUser: async (request: any) => {
-    request.user = { id: "test-user-id", email: "test@example.com" };
+    request.user = { id: "test-user-id", email: "test@example.com", role: "owner" };
   }
-}));
-
-vi.mock("../../auth/workspaceContext.js", () => ({
-  getWorkspaceContextForRequest: vi.fn(async (request: any) => {
-    if (!request.user) return null;
-    return {
-      userId: request.user.id,
-      workspaceId: request.user.workspaceId || "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: request.user.role || "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-  }),
-  requireWorkspaceContext: vi.fn(async (request: any, reply: any) => {
-    if (!request.user) {
-      reply.code(401).send({ error: "Unauthorized" });
-      return null;
-    }
-    return {
-      userId: request.user.id,
-      workspaceId: request.user.workspaceId || "test-workspace-id",
-      membershipId: "test-membership-id",
-      role: request.user.role || "owner",
-      permissions: ["settings.read", "settings.write"]
-    };
-  })
 }));
 
 vi.mock("../../services/apiUsageService.js", () => ({

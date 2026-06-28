@@ -1,15 +1,8 @@
 import { prisma } from "./prisma.js";
 
-export const WORKSPACE_INVITE_EXPIRY_SCHEDULER_NAME = "workspace_invite_expiry";
-
 export type SchedulerLastStatus = "running" | "success" | "failed" | "skipped" | "disabled";
 
 export interface SchedulerSafeSummary {
-  scanned?: number;
-  scannedWorkspaces?: number;
-  expired?: number;
-  warningsCreated?: number;
-  exceededCreated?: number;
   skipped?: number;
   usageDeleted?: number;
   notificationsDeleted?: number;
@@ -233,11 +226,6 @@ function sanitizeSummary(input?: SchedulerSafeSummary): SchedulerSafeSummary {
   const source = input?.source === "cli" ? "cli" : input?.source === "scheduler" ? "scheduler" : undefined;
   const lock = input?.lock === "acquired" || input?.lock === "skipped" || input?.lock === "unavailable" ? input.lock : undefined;
   return {
-    ...(safeNumber(input?.scanned) !== undefined ? { scanned: safeNumber(input?.scanned) } : {}),
-    ...(safeNumber(input?.scannedWorkspaces) !== undefined ? { scannedWorkspaces: safeNumber(input?.scannedWorkspaces) } : {}),
-    ...(safeNumber(input?.expired) !== undefined ? { expired: safeNumber(input?.expired) } : {}),
-    ...(safeNumber(input?.warningsCreated) !== undefined ? { warningsCreated: safeNumber(input?.warningsCreated) } : {}),
-    ...(safeNumber(input?.exceededCreated) !== undefined ? { exceededCreated: safeNumber(input?.exceededCreated) } : {}),
     ...(safeNumber(input?.skipped) !== undefined ? { skipped: safeNumber(input?.skipped) } : {}),
     ...(safeNumber(input?.usageDeleted) !== undefined ? { usageDeleted: safeNumber(input?.usageDeleted) } : {}),
     ...(safeNumber(input?.notificationsDeleted) !== undefined ? { notificationsDeleted: safeNumber(input?.notificationsDeleted) } : {}),

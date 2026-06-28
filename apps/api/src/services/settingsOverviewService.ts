@@ -51,8 +51,7 @@ export interface SettingsOverview {
 
 export async function getSettingsOverview(
   userId: string,
-  currentUser?: AuthenticatedUser,
-  workspaceContext?: { role: WorkspaceRole; permissions: Permission[]; membershipId: string }
+  currentUser?: AuthenticatedUser
 ): Promise<SettingsOverview> {
   const now = Date.now();
   const from24h = new Date(now - 24 * 60 * 60 * 1000);
@@ -100,7 +99,9 @@ export async function getSettingsOverview(
     .filter((item) => item.status === "failed" || item.status === "timeout" || item.status === "client_disconnected")
     .reduce((sum, item) => sum + item._count.id, 0);
 
-  let role = workspaceContext?.role;
+  // Role comes from the authenticated user when available (set by auth
+  // middleware), otherwise a direct DB lookup. No workspace context anymore.
+  let role = currentUser?.role ? normalizeWorkspaceRole(currentUser.role, "owner") : undefined;
   if (!role) {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     role = normalizeWorkspaceRole(user?.role, "owner");
@@ -109,9 +110,9 @@ export async function getSettingsOverview(
   return {
     currentUser: {
       id: userId,
-      membershipId: workspaceContext?.membershipId || "unknown",
+      membershipId: "local",
       role,
-      permissions: workspaceContext?.permissions || getPermissionsForRole(role)
+      permissions: getPermissionsForRole(role)
     },
     providers: {
       total: providerHealth.length,

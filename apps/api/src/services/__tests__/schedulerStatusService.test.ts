@@ -18,8 +18,8 @@ describe("schedulerStatusService", () => {
       enabled: true,
       lockAcquired: true,
       summary: {
-        scanned: 10,
-        expired: 3,
+        usageDeleted: 10,
+        notificationsDeleted: 3,
         skipped: 7,
         dryRun: false,
         durationMs: 123,
@@ -32,8 +32,8 @@ describe("schedulerStatusService", () => {
     expect(status?.lastStatus).toBe("success");
     expect(status?.lastLockAcquired).toBe(true);
     expect(status?.lastSummary).toEqual({
-      scanned: 10,
-      expired: 3,
+      usageDeleted: 10,
+      notificationsDeleted: 3,
       skipped: 7,
       dryRun: false,
       durationMs: 123,
