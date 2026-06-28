@@ -16,7 +16,6 @@ const FORBIDDEN_RESPONSE_KEYS = [
 
 const SAFE_SETTINGS_ENDPOINTS = [
   "/settings/overview",
-  "/settings/provider-recovery/scheduler-status",
   "/settings/provider-health/incidents?limit=10",
   "/settings/provider-health/diagnostics-runs?limit=10",
   "/settings/notification-delivery/dead-letters?limit=10",

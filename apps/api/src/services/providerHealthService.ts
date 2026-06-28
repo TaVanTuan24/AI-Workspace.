@@ -5,7 +5,6 @@ import { AesGcmSessionVault } from "@uaiw/session-vault/index.js";
 import { env } from "../config/env.js";
 import { recordHealthObservation } from "./providerHealthIncidentService.js";
 import type { ProviderId, ProviderCapability, ProviderUiDiagnosis } from "@uaiw/shared/types/provider.js";
-import { getEffectiveRecoveryState } from "./providerRecoveryOverrideService.js";
 
 const sessionVault = new AesGcmSessionVault();
 
@@ -22,12 +21,6 @@ export interface ProviderHealth {
   lastValidatedAt?: string | null;
   errorCode?: string | null;
   errorMessage?: string | null;
-  recovery?: {
-    providerDegraded: boolean;
-    degradedMode?: "avoid_if_possible" | "block_for_duration";
-    degradedUntil?: string;
-    degradedReason?: string;
-  };
 }
 
 export async function getProviderHealth(userId: string): Promise<ProviderHealth[]> {
@@ -36,7 +29,6 @@ export async function getProviderHealth(userId: string): Promise<ProviderHealth[
   });
 
   const byProvider = new Map(connections.map(c => [c.provider, c]));
-  const recoveryState = await getEffectiveRecoveryState(userId);
 
   return providerRegistry.list().map(def => {
     const conn = byProvider.get(def.id);
@@ -50,14 +42,11 @@ export async function getProviderHealth(userId: string): Promise<ProviderHealth[
     else if (connectionStatus === "expired") healthStatus = "expired";
     else if (connectionStatus === "error") healthStatus = "error";
 
-    const degraded = recoveryState.degradedProviders[def.id];
-    const isBlockedByRecovery = degraded?.mode === "block_for_duration";
-    const isUsable = 
+    const isUsable =
       def.readiness === "ready" &&
       def.capabilities.includes("send_message") &&
       connectionStatus === "connected" &&
-      healthStatus === "healthy" &&
-      !isBlockedByRecovery;
+      healthStatus === "healthy";
 
     return {
       provider: def.id as ProviderId,
@@ -71,13 +60,7 @@ export async function getProviderHealth(userId: string): Promise<ProviderHealth[
       lastConnectedAt: conn?.lastConnectedAt?.toISOString(),
       lastValidatedAt: lastValidatedAt?.toISOString(),
       errorCode: conn?.errorCode,
-      errorMessage: conn?.errorMessageSafe,
-      recovery: {
-        providerDegraded: Boolean(degraded),
-        degradedMode: degraded?.mode,
-        degradedUntil: degraded?.expiresAt,
-        degradedReason: degraded?.reason
-      }
+      errorMessage: conn?.errorMessageSafe
     };
   });
 }

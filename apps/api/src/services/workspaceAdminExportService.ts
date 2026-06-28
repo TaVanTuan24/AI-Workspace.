@@ -17,7 +17,6 @@ export interface WorkspaceAdminExportDTO {
   activityTimeline: { events: Array<Record<string, unknown>>; totalReturned: number };
   quotaReport?: Awaited<ReturnType<typeof getWorkspaceQuotaReport>> | null;
   inviteSummary: { total: number; pending: number; accepted: number; revoked: number; expired: number };
-  recoveryOverrides: { active: number; expired: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -39,7 +38,7 @@ export async function getWorkspaceAdminExport(params: {
   if (!workspace) throw new Error("Workspace not found");
 
   // Parallel fetches
-  const [adminOverview, schedulerFleetStatus, activityResult, quotaReport, inviteCounts, recoveryOverrides] =
+  const [adminOverview, schedulerFleetStatus, activityResult, quotaReport, inviteCounts] =
     await Promise.all([
       getWorkspaceAdminOverview({ workspaceId }),
       getSchedulerFleetStatus(),
@@ -51,7 +50,6 @@ export async function getWorkspaceAdminExport(params: {
       }),
       getWorkspaceQuotaReport({ actorUserId, workspaceId, range }).catch(() => null),
       getInviteSummary(workspaceId),
-      getRecoveryOverrideSummary(workspaceId),
     ]);
 
   return {
@@ -66,7 +64,6 @@ export async function getWorkspaceAdminExport(params: {
     },
     quotaReport,
     inviteSummary: inviteCounts,
-    recoveryOverrides,
   };
 }
 
@@ -83,23 +80,4 @@ async function getInviteSummary(workspaceId: string) {
     prisma.workspaceInvite.count({ where: { workspaceId, status: "expired" } }),
   ]);
   return { total, pending, accepted, revoked, expired };
-}
-
-async function getRecoveryOverrideSummary(workspaceId: string) {
-  const memberIds = await prisma.workspaceMembership.findMany({
-    where: { workspaceId, status: "active" },
-    select: { userId: true },
-  });
-  const userIds = memberIds.map((m) => m.userId);
-  if (userIds.length === 0) return { active: 0, expired: 0 };
-
-  const [active, expired] = await Promise.all([
-    prisma.providerRecoveryOverride.count({
-      where: { userId: { in: userIds }, status: "active", expiresAt: { gt: new Date() } },
-    }),
-    prisma.providerRecoveryOverride.count({
-      where: { userId: { in: userIds }, status: { not: "active" } },
-    }),
-  ]);
-  return { active, expired };
 }

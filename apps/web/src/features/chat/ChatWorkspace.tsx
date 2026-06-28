@@ -480,15 +480,6 @@ export function ChatWorkspace() {
           />
         ) : null}
 
-        {mode === "single" && selectedSingleModel?.recovery?.providerDegraded && selectedSingleModel.recovery.degradedMode !== "block_for_duration" ? (
-          <ProviderWarning
-            title={`${selectedSingleModel.displayName} is temporarily degraded`}
-            message={selectedSingleModel.recovery.degradedReason ?? "A recovery policy recommends using a fallback provider if possible."}
-            actionHref="/settings/provider-recovery"
-            actionLabel="Review overrides"
-          />
-        ) : null}
-
         {mode === "compare" && selectedCompareNotifications.length > 0 ? (
           <ProviderWarning
             title={
@@ -627,12 +618,6 @@ export function ProviderRow({
   onChange: () => void;
 }) {
   const chatReady = provider.capabilities.includes("send_message") && provider.readiness === "ready";
-  const recoveryLabel = model?.recovery?.temporarilyDisabled
-    ? "temporarily disabled"
-    : model?.recovery?.providerDegraded
-      ? model.recovery.degradedMode === "block_for_duration" ? "recovery blocked" : "degraded"
-      : null;
-  const disabledByRecovery = Boolean(model?.recovery?.temporarilyDisabled || model?.recovery?.degradedMode === "block_for_duration");
   return (
     <label className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
       <span>
@@ -641,8 +626,7 @@ export function ProviderRow({
           {provider.status} · {chatReady ? "chat-ready" : provider.readiness}
         </span>
       </span>
-      {recoveryLabel ? <span className="text-xs text-amber-600">{recoveryLabel}</span> : null}
-      <input type={type} checked={checked} onChange={onChange} disabled={disabledByRecovery} />
+      <input type={type} checked={checked} onChange={onChange} />
     </label>
   );
 }

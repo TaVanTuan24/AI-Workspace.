@@ -45,7 +45,6 @@ const mockExport = {
   activityTimeline: { events: [], totalReturned: 0 },
   quotaReport: null,
   inviteSummary: { total: 0, pending: 0, accepted: 0, revoked: 0, expired: 0 },
-  recoveryOverrides: { active: 0, expired: 0 },
 };
 
 describe("workspaceAdminExport route", () => {

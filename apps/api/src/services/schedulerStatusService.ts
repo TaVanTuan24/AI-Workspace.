@@ -1,6 +1,5 @@
 import { prisma } from "./prisma.js";
 
-export const PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_NAME = "provider_recovery_override_expiry";
 export const WORKSPACE_INVITE_EXPIRY_SCHEDULER_NAME = "workspace_invite_expiry";
 
 export type SchedulerLastStatus = "running" | "success" | "failed" | "skipped" | "disabled";

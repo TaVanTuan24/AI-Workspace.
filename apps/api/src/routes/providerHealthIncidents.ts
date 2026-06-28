@@ -7,7 +7,6 @@ import {
   getProviderHealthIncident, 
   resolveIncident 
 } from "../services/providerHealthIncidentService.js";
-import { buildRunbook } from "../services/providerRecoveryRunbookService.js";
 import { refreshProviderHealth, runUiDiagnostics } from "../services/providerHealthService.js";
 import { providerDiagnosticsHistoryService } from "../services/providerDiagnosticsHistoryService.js";
 import { providerDiagnosticsBaselineService } from "../services/providerDiagnosticsBaselineService.js";
@@ -130,52 +129,6 @@ export async function providerHealthIncidentsRoutes(app: FastifyInstance) {
       } else if (err.message === "Incident not found") {
         return reply.code(404).send({ error: err.message });
       }
-      return reply.code(500).send({ error: "Internal server error" });
-    }
-  });
-
-  app.get("/settings/provider-health/incidents/:id/runbook", async (request, reply) => {
-    if (!(await requirePermission(request, reply, "providerDiagnostics.read"))) return;
-    if (!request.user || !request.user.id) return reply.code(401).send({ error: "Unauthorized" });
-    try {
-      const { id } = request.params as { id: string };
-      const incident = await getProviderHealthIncident(request.user.id, id);
-      if (!incident) return reply.code(404).send({ error: "Incident not found" });
-      const runbook = buildRunbook({
-        userId: request.user.id,
-        provider: incident.provider,
-        status: incident.status,
-        severity: incident.severity,
-        incidentId: incident.id,
-        connectionId: incident.connectionId || undefined,
-        reason: incident.reason || undefined,
-        metadata: incident.metadata ? JSON.parse(incident.metadata) : undefined
-      });
-      return reply.send({ data: runbook });
-    } catch (err: any) {
-      return reply.code(500).send({ error: "Internal server error" });
-    }
-  });
-
-  app.get("/settings/provider-health/runbook", async (request, reply) => {
-    if (!(await requirePermission(request, reply, "providerDiagnostics.read"))) return;
-    if (!request.user || !request.user.id) return reply.code(401).send({ error: "Unauthorized" });
-    try {
-      const schema = z.object({
-        provider: z.string(),
-        status: z.string(),
-        connectionId: z.string().optional()
-      });
-      const query = schema.parse(request.query);
-      const runbook = buildRunbook({
-        userId: request.user.id,
-        provider: query.provider,
-        status: query.status,
-        connectionId: query.connectionId
-      });
-      return reply.send({ data: runbook });
-    } catch (err: any) {
-      if (err instanceof z.ZodError) return reply.code(400).send({ error: "Validation failed", details: err.errors });
       return reply.code(500).send({ error: "Internal server error" });
     }
   });

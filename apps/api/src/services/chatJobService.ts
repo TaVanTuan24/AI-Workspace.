@@ -3,19 +3,12 @@ import { prisma } from "./prisma.js";
 import { providerRegistry } from "./providerRegistry.js";
 import { enqueueChatJob } from "./chatQueue.js";
 import { publishJobEvent } from "./redisJobEventPublisher.js";
-import { getModelRecoveryStatus } from "./providerRecoveryOverrideService.js";
 
 export interface ProviderItemError {
   provider: string;
   errorCode: ErrorCode | "UNKNOWN_PROVIDER" | "CHAT_JOB_FAILED";
   message: string;
 }
-
-const MODEL_BY_PROVIDER: Record<ProviderId, string> = {
-  chatgpt: "chatgpt-web",
-  gemini: "gemini-web",
-  claude: "claude-web"
-};
 
 export async function validateRunnableProvider(
   userId: string,
@@ -40,29 +33,6 @@ export async function validateRunnableProvider(
         provider: providerValue,
         errorCode: "PROVIDER_NOT_READY",
         message: "This provider is not chat-ready yet."
-      }
-    };
-  }
-
-  const recovery = await getModelRecoveryStatus(userId, MODEL_BY_PROVIDER[providerValue], providerValue);
-  if (recovery.temporarilyDisabled) {
-    return {
-      ok: false,
-      error: {
-        provider: providerValue,
-        errorCode: "PROVIDER_NOT_READY",
-        message: `This model is temporarily disabled by a recovery policy until ${recovery.disabledUntil}.`
-      }
-    };
-  }
-
-  if (recovery.providerDegraded && recovery.degradedMode === "block_for_duration") {
-    return {
-      ok: false,
-      error: {
-        provider: providerValue,
-        errorCode: "PROVIDER_NOT_READY",
-        message: `This provider is temporarily blocked by a recovery policy until ${recovery.degradedUntil}.`
       }
     };
   }

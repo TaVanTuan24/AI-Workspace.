@@ -7,7 +7,6 @@ import {
   DatabaseBackup,
   Gauge,
   KeyRound,
-  LifeBuoy,
   LayoutDashboard,
   Shield,
   SlidersHorizontal,
@@ -78,12 +77,6 @@ export const settingsNavItems = [
     label: "Provider Health",
     description: "Session readiness",
     icon: Activity
-  },
-  {
-    href: "/settings/provider-recovery",
-    label: "Recovery Policies",
-    description: "Safe automation",
-    icon: LifeBuoy
   },
   {
     href: "/settings/users",

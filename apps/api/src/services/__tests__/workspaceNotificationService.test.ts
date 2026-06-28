@@ -4,7 +4,6 @@ import { getProviderLimitAnalytics } from "../apiUsageService.js";
 import { getModelPreferences } from "../modelPreferenceService.js";
 import { getNotificationPreferences } from "../notificationPreferenceService.js";
 import { getProviderHealth } from "../providerHealthService.js";
-import { evaluateProviderRecoveryPolicies } from "../providerRecoveryPolicyService.js";
 import { materializeNotificationEvents } from "../notificationEventService.js";
 
 vi.mock("../apiUsageService.js", () => ({
@@ -21,10 +20,6 @@ vi.mock("../notificationPreferenceService.js", () => ({
 
 vi.mock("../providerHealthService.js", () => ({
   getProviderHealth: vi.fn()
-}));
-
-vi.mock("../providerRecoveryPolicyService.js", () => ({
-  evaluateProviderRecoveryPolicies: vi.fn()
 }));
 
 vi.mock("../notificationEventService.js", () => ({
@@ -162,26 +157,6 @@ describe("workspaceNotificationService", () => {
         })
       ])
     );
-  });
-
-  it("evaluates no usable models recovery policies only when materializing events", async () => {
-    vi.mocked(getProviderHealth).mockResolvedValue([providerHealth("chatgpt", "requires_login", false)] as any);
-    vi.mocked(getModelPreferences).mockResolvedValue({
-      models: [modelPreference("chatgpt-web", "chatgpt", true, false)] as any,
-      autoSelectFirstUsable: true
-    });
-    vi.mocked(materializeNotificationEvents).mockResolvedValueOnce([{ id: "evt_no_models", provider: undefined } as any]);
-
-    await getWorkspaceNotifications(userId);
-    expect(evaluateProviderRecoveryPolicies).not.toHaveBeenCalled();
-
-    await getWorkspaceNotifications(userId, { materializeEvents: true });
-    expect(evaluateProviderRecoveryPolicies).toHaveBeenCalledWith(expect.objectContaining({
-      userId,
-      triggerType: "no_usable_models",
-      severity: "critical",
-      status: "no_usable_models"
-    }));
   });
 
   it("does not expose forbidden fields", async () => {

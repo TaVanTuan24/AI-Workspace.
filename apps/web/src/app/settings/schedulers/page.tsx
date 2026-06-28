@@ -60,7 +60,7 @@ export default function SchedulersPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight text-slate-100">Scheduler Fleet Status</h1>
         <p className="text-slate-400 mt-2">
-          Background job schedulers managing health checks, invite expiry, quota alerts, and recovery policies.
+          Background job schedulers managing health checks, invite expiry, and quota alerts.
         </p>
       </header>
 

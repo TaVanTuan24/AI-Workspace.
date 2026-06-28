@@ -325,7 +325,7 @@ export default function ModelPreferencesPage() {
                       })()}
                     </td>
                     <td className="p-4">
-                      <StatusBadge isUsable={model.isUsable} status={model.healthStatus} recovery={model.recovery} />
+                      <StatusBadge isUsable={model.isUsable} status={model.healthStatus} />
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2 flex-wrap max-w-[150px] ml-auto">

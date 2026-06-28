@@ -93,7 +93,6 @@ export async function workspaceQuotaRoutes(app: FastifyInstance) {
       maxMonthlyApiRequests: z.number().int().min(0).nullable().optional(),
       maxMonthlyInviteEmails: z.number().int().min(0).nullable().optional(),
       maxWebhookDestinations: z.number().int().min(0).nullable().optional(),
-      maxRecoveryPolicies: z.number().int().min(0).nullable().optional(),
       maxDiagnosticsBaselines: z.number().int().min(0).nullable().optional(),
     });
 

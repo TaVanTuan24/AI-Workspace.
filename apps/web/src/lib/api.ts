@@ -13,8 +13,6 @@ export type WorkspacePermission =
   | "providerConnections.write"
   | "providerDiagnostics.read"
   | "providerDiagnostics.action"
-  | "providerRecovery.read"
-  | "providerRecovery.write"
   | "webhooks.read"
   | "webhooks.write"
   | "notifications.read"
@@ -258,9 +256,6 @@ export interface SettingsOverview {
   };
   scheduler: {
     providerHealthEnabled: boolean;
-  };
-  recovery?: {
-    activeOverrides: number;
   };
 }
 
@@ -734,136 +729,6 @@ export async function resolveProviderDiagnosticsDriftAlert(alertId: string, reso
   return response.json();
 }
 
-// -- Provider Recovery Policies --
-
-export type ProviderRecoveryTriggerType =
-  | "provider_incident_opened"
-  | "provider_incident_repeated"
-  | "provider_incident_critical"
-  | "diagnostics_drift_alert_opened"
-  | "diagnostics_drift_alert_error"
-  | "no_usable_models";
-
-export type ProviderRecoveryActionType =
-  | "notify_in_app"
-  | "run_safe_health_check"
-  | "run_safe_ui_diagnostics"
-  | "create_or_update_incident"
-  | "mark_provider_temporarily_degraded"
-  | "prefer_fallback_provider"
-  | "disable_model_temporarily";
-
-export interface ProviderRecoveryActionView {
-  type: ProviderRecoveryActionType;
-  enabled: boolean;
-  config?: Record<string, unknown>;
-  availability?: "available" | "scaffolded" | "unsupported";
-}
-
-export interface ProviderRecoveryPolicyView {
-  id: string;
-  name: string;
-  enabled: boolean;
-  triggerTypes: ProviderRecoveryTriggerType[];
-  providers: ProviderId[];
-  severities: string[];
-  statuses: string[];
-  actions: ProviderRecoveryActionView[];
-  cooldownMinutes: number;
-  lastTriggeredAt?: string;
-  triggerCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProviderRecoveryPolicyRunView {
-  id: string;
-  policyId: string;
-  policyName?: string;
-  triggerType: ProviderRecoveryTriggerType;
-  triggerRefId?: string;
-  provider?: string;
-  severity?: string;
-  status: "running" | "success" | "partial" | "failed" | "skipped";
-  actionsAttempted: string[];
-  actionsSucceeded: string[];
-  actionsFailed: Array<{ type: string; reason: string }>;
-  skippedReason?: string;
-  startedAt: string;
-  completedAt?: string;
-}
-
-export interface ProviderRecoveryOverrideView {
-  id: string;
-  actionType: ProviderRecoveryActionType;
-  provider?: ProviderId;
-  modelId?: string;
-  subModelId?: string;
-  status: "active" | "expired" | "rolled_back" | "superseded" | "failed";
-  reason?: string;
-  safeSummary?: string;
-  startsAt: string;
-  expiresAt: string;
-  resolvedAt?: string;
-  resolution?: string;
-  policyId?: string;
-  policyRunId?: string;
-}
-
-export interface RecoverySchedulerStatusView {
-  name: "provider_recovery_override_expiry";
-  enabled: boolean;
-  intervalSeconds: number;
-  maxPerRun: number;
-  lockTtlSeconds: number;
-  lastStartedAt?: string;
-  lastFinishedAt?: string;
-  lastStatus?: "running" | "success" | "failed" | "skipped" | "disabled";
-  lastError?: string;
-  lastLockAcquired?: boolean;
-  lastSummary?: {
-    scanned?: number;
-    expired?: number;
-    skipped?: number;
-    dryRun?: boolean;
-    durationMs?: number;
-    lock?: "acquired" | "skipped" | "unavailable";
-    source?: "scheduler" | "cli";
-  };
-  runCount: number;
-  failureCount: number;
-  skippedCount: number;
-}
-
-export interface ProviderRecoveryPolicyInput {
-  name: string;
-  enabled?: boolean;
-  triggerTypes: string[];
-  providers?: string[];
-  severities?: string[];
-  statuses?: string[];
-  actions: Array<{ type: string; enabled?: boolean; config?: Record<string, unknown> }>;
-  cooldownMinutes?: number;
-}
-
-export async function listProviderRecoveryPolicies(): Promise<{ data: ProviderRecoveryPolicyView[] }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to list recovery policies");
-  return response.json();
-}
-
-export async function getProviderRecoverySchedulerStatus(): Promise<{ data: RecoverySchedulerStatusView }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/scheduler-status`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to load recovery scheduler status");
-  return response.json();
-}
-
 export interface WorkspaceQuotaAlertSchedulerStatus {
   enabled: boolean;
   intervalSeconds: number;
@@ -892,114 +757,6 @@ export async function getWorkspaceQuotaAlertSchedulerStatus(): Promise<Workspace
   });
   if (!response.ok) throw new Error("Failed to load workspace quota alert scheduler status");
   return response.json();
-}
-
-export async function createProviderRecoveryPolicy(input: ProviderRecoveryPolicyInput): Promise<{ data: ProviderRecoveryPolicyView }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(input)
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to create recovery policy");
-  return payload;
-}
-
-export async function updateProviderRecoveryPolicy(id: string, input: Partial<ProviderRecoveryPolicyInput>): Promise<{ data: ProviderRecoveryPolicyView }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(input)
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to update recovery policy");
-  return payload;
-}
-
-export async function setProviderRecoveryPolicyEnabled(id: string, enabled: boolean): Promise<{ data: ProviderRecoveryPolicyView }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies/${id}/${enabled ? "enable" : "disable"}`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to update recovery policy");
-  return payload;
-}
-
-export async function deleteProviderRecoveryPolicy(id: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies/${id}`, {
-    method: "DELETE",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to delete recovery policy");
-  return payload;
-}
-
-export async function listProviderRecoveryPolicyRuns(params?: {
-  policyId?: string;
-  status?: string;
-  limit?: number;
-}): Promise<{ data: ProviderRecoveryPolicyRunView[] }> {
-  const query = new URLSearchParams();
-  if (params?.policyId) query.set("policyId", params.policyId);
-  if (params?.status) query.set("status", params.status);
-  if (params?.limit) query.set("limit", params.limit.toString());
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policy-runs?${query.toString()}`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to list recovery policy runs");
-  return response.json();
-}
-
-export async function previewProviderRecoveryPolicies(input: {
-  triggerType: string;
-  provider?: string;
-  severity?: string;
-  status?: string;
-}): Promise<{ data: { matchedPolicies: Array<ProviderRecoveryPolicyView & { actionsWouldRun: ProviderRecoveryActionView[]; skippedReason?: string }> } }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/policies/preview`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(input)
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to preview recovery policies");
-  return payload;
-}
-
-export async function listProviderRecoveryOverrides(params?: {
-  status?: "active" | "expired" | "rolled_back" | "superseded" | "failed" | "all";
-  provider?: string;
-  actionType?: string;
-  limit?: number;
-}): Promise<{ data: ProviderRecoveryOverrideView[] }> {
-  const query = new URLSearchParams();
-  if (params?.status) query.set("status", params.status);
-  if (params?.provider) query.set("provider", params.provider);
-  if (params?.actionType) query.set("actionType", params.actionType);
-  if (params?.limit) query.set("limit", params.limit.toString());
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/overrides?${query.toString()}`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to list recovery overrides");
-  return response.json();
-}
-
-export async function rollbackProviderRecoveryOverride(
-  id: string,
-  resolution: "manual_rollback" | "fixed" | "incorrect_policy" = "manual_rollback"
-): Promise<{ data: ProviderRecoveryOverrideView }> {
-  const response = await fetch(`${API_BASE_URL}/settings/provider-recovery/overrides/${id}/rollback`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify({ resolution })
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Failed to roll back recovery override");
-  return payload;
 }
 
 // -- Notification Preferences --
@@ -1470,12 +1227,6 @@ export interface ProviderHealth {
   lastValidatedAt?: string | null;
   errorCode?: string | null;
   errorMessage?: string | null;
-  recovery?: {
-    providerDegraded: boolean;
-    degradedMode?: "avoid_if_possible" | "block_for_duration";
-    degradedUntil?: string;
-    degradedReason?: string;
-  };
 }
 
 export async function getProviderHealth(): Promise<{ data: ProviderHealth[] }> {
@@ -1575,15 +1326,6 @@ export interface ModelPreferenceView {
   capabilities: string[];
   subModels?: Array<{ id: string; label: string; available?: boolean | "detect" }>;
   selectedSubModelId?: string | null;
-  recovery?: {
-    providerDegraded: boolean;
-    degradedMode?: "avoid_if_possible" | "block_for_duration";
-    degradedUntil?: string;
-    degradedReason?: string;
-    temporarilyDisabled: boolean;
-    disabledUntil?: string;
-    disabledReason?: string;
-  };
 }
 
 export interface ModelPreferencesResponse {
@@ -1926,7 +1668,6 @@ export type WorkspaceQuotaResource =
   | "apiKeys"
   | "providerConnections"
   | "webhookDestinations"
-  | "recoveryPolicies"
   | "diagnosticsBaselines"
   | "monthlyApiRequests"
   | "monthlyInviteEmails";
@@ -1960,7 +1701,6 @@ export interface UpdateQuotaPatch {
   maxApiKeys?: number | null;
   maxProviderConnections?: number | null;
   maxWebhookDestinations?: number | null;
-  maxRecoveryPolicies?: number | null;
   maxDiagnosticsBaselines?: number | null;
   maxMonthlyApiRequests?: number | null;
   maxMonthlyInviteEmails?: number | null;

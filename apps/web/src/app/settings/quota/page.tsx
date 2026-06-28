@@ -269,7 +269,6 @@ function formatResourceName(resource: string) {
     apiKeys: "API Keys",
     providerConnections: "Provider Connections",
     webhookDestinations: "Webhook Destinations",
-    recoveryPolicies: "Recovery Policies",
     diagnosticsBaselines: "Diagnostics Baselines",
     monthlyApiRequests: "API Requests (Monthly)",
     monthlyInviteEmails: "Invite Emails (Monthly)"

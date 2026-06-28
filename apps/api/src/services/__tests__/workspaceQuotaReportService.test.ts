@@ -18,7 +18,6 @@ vi.mock("../prisma.js", () => ({
     internalApiKey: { count: vi.fn() },
     providerConnection: { count: vi.fn() },
     notificationWebhookDestination: { count: vi.fn() },
-    providerRecoveryPolicy: { count: vi.fn() },
     providerDiagnosticsBaseline: { count: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -54,7 +53,6 @@ describe("workspaceQuotaReportService", () => {
       maxApiKeys: null,
       maxProviderConnections: null,
       maxWebhookDestinations: null,
-      maxRecoveryPolicies: null,
       maxDiagnosticsBaselines: null,
       maxMonthlyApiRequests: null,
       maxMonthlyInviteEmails: null

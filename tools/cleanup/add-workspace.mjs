@@ -10,7 +10,6 @@ let content = fs.readFileSync(schemaPath, 'utf8');
 
 const modelsToUpdate = [
     'ProviderConnection', 'ProviderDiagnosticsBaseline', 'ProviderDiagnosticsDriftAlert',
-    'ProviderRecoveryPolicy', 'ProviderRecoveryPolicyRun', 'ProviderRecoveryOverride',
     'ProviderDiagnosticsRun', 'ProviderHealthIncident', 'InternalApiKey',
     'InternalApiUsageLog', 'UserModelPreference', 'ProviderRateLimitSetting',
     'NotificationDeliveryPreference', 'NotificationDeliveryAttempt',

@@ -212,9 +212,6 @@ export async function validateGeneratedEnv({ outPath, content, values, gitignore
   if (values.PROVIDER_HEALTH_SCHEDULER_ENABLED !== "false") {
     errors.push("PROVIDER_HEALTH_SCHEDULER_ENABLED must remain false for release smoke.");
   }
-  if (values.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED !== "false") {
-    errors.push("PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED must remain false for release smoke.");
-  }
   if (/storage-state|provider-session/i.test(content)) {
     errors.push("Generated env must not reference provider session/storageState paths.");
   }

@@ -67,7 +67,6 @@ describe("serializationSafety", () => {
       schedulerFleetStatus: { schedulers: [] },
       activityTimeline: { events: [], totalReturned: 0 },
       inviteSummary: { total: 0, pending: 0, accepted: 0, revoked: 0, expired: 0 },
-      recoveryOverrides: { active: 0, expired: 0 },
     };
     expect(() => assertSafeSerializedPayload(payload)).not.toThrow();
   });

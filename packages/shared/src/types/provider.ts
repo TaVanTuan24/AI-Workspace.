@@ -284,7 +284,6 @@ export interface WorkspaceNotification {
     | "provider_unusable"
     | "no_usable_models"
     | "provider_limit_spike"
-    | "provider_recovery_policy"
     | "test_webhook";
   title: string;
   message: string;

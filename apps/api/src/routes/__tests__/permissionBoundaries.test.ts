@@ -5,7 +5,6 @@ import { modelPreferenceRoutes } from "../modelPreferences.js";
 import { notificationDeliveryRoutes } from "../notificationDelivery.js";
 import { providerHealthRoutes } from "../providerHealth.js";
 import { providerRateLimitRoutes } from "../providerRateLimits.js";
-import { providerRecoveryPolicyRoutes } from "../providerRecoveryPolicies.js";
 import { providerRoutes } from "../providers.js";
 
 const state = vi.hoisted(() => ({
@@ -132,16 +131,6 @@ describe("route permission boundaries", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "permission_denied" });
-  });
-
-  it("denies member recovery override rollback", async () => {
-    const app = await buildApp(providerRecoveryPolicyRoutes);
-    const response = await app.inject({
-      method: "POST",
-      url: "/settings/provider-recovery/overrides/override_1/rollback",
-      payload: { resolution: "manual_rollback" }
-    });
-    expect(response.statusCode).toBe(403);
   });
 
   it("denies member webhook secret rotation", async () => {

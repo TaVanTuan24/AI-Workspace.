@@ -11,7 +11,6 @@ export interface QuotaPreset {
     maxApiKeys: number | null;
     maxProviderConnections: number | null;
     maxWebhookDestinations: number | null;
-    maxRecoveryPolicies: number | null;
     maxDiagnosticsBaselines: number | null;
     maxMonthlyApiRequests: number | null;
     maxMonthlyInviteEmails: number | null;
@@ -28,7 +27,6 @@ export const WORKSPACE_QUOTA_PRESETS: Record<string, QuotaPreset> = {
       maxApiKeys: null,
       maxProviderConnections: null,
       maxWebhookDestinations: null,
-      maxRecoveryPolicies: null,
       maxDiagnosticsBaselines: null,
       maxMonthlyApiRequests: null,
       maxMonthlyInviteEmails: null
@@ -43,7 +41,6 @@ export const WORKSPACE_QUOTA_PRESETS: Record<string, QuotaPreset> = {
       maxApiKeys: 3,
       maxProviderConnections: 3,
       maxWebhookDestinations: 2,
-      maxRecoveryPolicies: 3,
       maxDiagnosticsBaselines: 5,
       maxMonthlyApiRequests: 1000,
       maxMonthlyInviteEmails: 50
@@ -58,7 +55,6 @@ export const WORKSPACE_QUOTA_PRESETS: Record<string, QuotaPreset> = {
       maxApiKeys: 10,
       maxProviderConnections: 10,
       maxWebhookDestinations: 10,
-      maxRecoveryPolicies: 20,
       maxDiagnosticsBaselines: 50,
       maxMonthlyApiRequests: 10000,
       maxMonthlyInviteEmails: 500
@@ -109,7 +105,6 @@ export async function applyWorkspaceQuotaPreset(input: ApplyPresetInput): Promis
     api_keys: preset.quotas.maxApiKeys,
     provider_connections: preset.quotas.maxProviderConnections,
     webhook_destinations: preset.quotas.maxWebhookDestinations,
-    recovery_policies: preset.quotas.maxRecoveryPolicies,
     diagnostics_baselines: preset.quotas.maxDiagnosticsBaselines,
     monthly_api_requests: preset.quotas.maxMonthlyApiRequests,
     monthly_invite_emails: preset.quotas.maxMonthlyInviteEmails

@@ -9,7 +9,7 @@ import { RedisJobEventSubscriber } from "../services/redisJobEventBus.js";
 import { prisma } from "../services/prisma.js";
 import { createUsageStart, completeUsageError, completeUsageSuccess, logProviderRateLimitHit } from "../services/apiUsageService.js";
 import { getProviderHealth } from "../services/providerHealthService.js";
-import { getModelPreferences, getModelTemporaryDisable, isModelEnabled } from "../services/modelPreferenceService.js";
+import { getModelPreferences, isModelEnabled } from "../services/modelPreferenceService.js";
 import { getCachedLiveSubModels } from "../services/providerLiveSubModelService.js";
 import { isModelAllowedForApiKey } from "../services/apiKeyService.js";
 import { OPENAI_COMPAT_MODELS, convertMessagesToPrompt } from "../services/openaiCompatModels.js";
@@ -87,15 +87,6 @@ export async function openaiCompatRoutes(app: FastifyInstance) {
             allowedByKey: true,
             selectedSubModelId: pref.selectedSubModelId,
             selectedSubModelLabel: pref.selectedSubModelLabel,
-            recovery: {
-              providerDegraded: pref.recovery.providerDegraded,
-              temporarilyDisabled: pref.recovery.temporarilyDisabled,
-              disabledUntil: pref.recovery.disabledUntil ?? null,
-              disabledReason: pref.recovery.disabledReason ?? null,
-              degradedUntil: pref.recovery.degradedUntil ?? null,
-              degradedReason: pref.recovery.degradedReason ?? null,
-              degradedMode: pref.recovery.degradedMode ?? null
-            },
             subModels: {
               static: pref.subModels || [],
               live: liveCache?.subModels || [],
@@ -168,25 +159,6 @@ export async function openaiCompatRoutes(app: FastifyInstance) {
     if (!modelDef) {
       if (usageLog) await completeUsageError(usageLog.id, { errorCode: "UNKNOWN_PROVIDER", durationMs: Date.now() - startedAt });
       return reply.code(400).send(mapInternalErrorToOpenAI("UNKNOWN_PROVIDER", "Model not found."));
-    }
-
-    const temporaryDisable = await getModelTemporaryDisable(request.user.id, model);
-    if (temporaryDisable) {
-      if (usageLog) {
-        await completeUsageError(usageLog.id, {
-          errorCode: "MODEL_TEMPORARILY_DISABLED",
-          errorType: "invalid_request_error",
-          durationMs: Date.now() - startedAt,
-          status: "failed"
-        });
-      }
-      return reply.code(400).send({
-        error: {
-          message: `Model is temporarily disabled by a recovery policy until ${temporaryDisable.until}.`,
-          type: "invalid_request_error",
-          code: "model_temporarily_disabled"
-        }
-      });
     }
 
     const enabled = await isModelEnabled(request.user.id, model);

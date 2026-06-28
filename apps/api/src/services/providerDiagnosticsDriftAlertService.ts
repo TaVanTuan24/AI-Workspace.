@@ -64,26 +64,6 @@ export class ProviderDiagnosticsDriftAlertService {
             metadataJson: JSON.stringify({ driftSummaryHash })
           }
         });
-        await evaluateRecoveryPolicySafely({
-          userId: params.userId,
-          triggerType: "diagnostics_drift_alert_opened",
-          triggerRefId: created.id,
-          provider: created.provider,
-          severity: created.severity,
-          status: created.status,
-          metadata: { source: "diagnostics_drift_alert", driftScore: created.driftScore }
-        });
-        if (created.severity === "error") {
-          await evaluateRecoveryPolicySafely({
-            userId: params.userId,
-            triggerType: "diagnostics_drift_alert_error",
-            triggerRefId: created.id,
-            provider: created.provider,
-            severity: created.severity,
-            status: created.status,
-            metadata: { source: "diagnostics_drift_alert", driftScore: created.driftScore }
-          });
-        }
         return created;
       }
     } else if (evaluation.driftScore < 25 && evaluation.baselineId) {
@@ -181,20 +161,3 @@ export class ProviderDiagnosticsDriftAlertService {
 }
 
 export const providerDiagnosticsDriftAlertService = new ProviderDiagnosticsDriftAlertService();
-
-async function evaluateRecoveryPolicySafely(input: {
-  userId: string;
-  triggerType: string;
-  triggerRefId: string;
-  provider?: string;
-  severity?: string;
-  status?: string;
-  metadata?: Record<string, unknown>;
-}) {
-  try {
-    const { evaluateProviderRecoveryPolicies } = await import("./providerRecoveryPolicyService.js");
-    await evaluateProviderRecoveryPolicies(input);
-  } catch {
-    // Recovery policy evaluation must not break diagnostics persistence.
-  }
-}

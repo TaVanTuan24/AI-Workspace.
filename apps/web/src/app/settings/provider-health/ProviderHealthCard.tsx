@@ -18,11 +18,6 @@ export function ProviderHealthCard({
           <h2 className="text-xl font-semibold text-slate-200">{health.displayName}</h2>
           <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-1 rounded">{health.provider}</span>
           <StatusBadge isUsable={health.isUsable} status={health.healthStatus} />
-          {health.recovery?.providerDegraded ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20">
-              {health.recovery.degradedMode === "block_for_duration" ? "Recovery blocked" : "Recovery degraded"}
-            </span>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -62,17 +57,6 @@ export function ProviderHealthCard({
             )}
           </div>
         )}
-        {health.recovery?.providerDegraded ? (
-          <div className="mt-2 text-sm text-amber-300 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
-            <div className="font-medium">Temporary recovery override active</div>
-            <div className="mt-1 text-amber-200/80">
-              {health.recovery.degradedReason || "Provider is temporarily marked degraded by a recovery policy."}
-            </div>
-            {health.recovery.degradedUntil ? (
-              <div className="mt-2 text-xs text-amber-200/70">Expires: {new Date(health.recovery.degradedUntil).toLocaleString()}</div>
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 min-w-[140px]">

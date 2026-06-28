@@ -20,7 +20,6 @@ import { notificationDeliveryRoutes } from "./routes/notificationDelivery.js";
 import { notificationPreferenceRoutes } from "./routes/notificationPreferences.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { providerLiveSubModelsRoutes } from "./routes/providerLiveSubModels.js";
-import { providerRecoveryPolicyRoutes } from "./routes/providerRecoveryPolicies.js";
 import { userRoutes } from "./routes/users.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 import { workspaceInviteRoutes } from "./routes/workspaceInvites.js";
@@ -30,7 +29,6 @@ import { workspaceAdminOverviewRoutes } from "./routes/workspaceAdminOverview.js
 import { workspaceSchedulerRoutes } from "./routes/workspaceSchedulers.js";
 import { workspaceAdminExportRoutes } from "./routes/workspaceAdminExport.js";
 import { providerHealthScheduler } from "./services/providerHealthScheduler.js";
-import { providerRecoveryOverrideExpiryScheduler } from "./services/providerRecoveryOverrideExpiryScheduler.js";
 import { workspaceInviteExpiryScheduler } from "./services/workspaceInviteExpiryScheduler.js";
 import { workspaceQuotaAlertScheduler } from "./services/workspaceQuotaAlertScheduler.js";
 import { healthRoutes } from "./routes/health.js";
@@ -73,7 +71,6 @@ await app.register(onboardingRoutes);
 await app.register(notificationDeliveryRoutes);
 await app.register(conversationsRoutes);
 await app.register(providerLiveSubModelsRoutes);
-await app.register(providerRecoveryPolicyRoutes);
 await app.register(userRoutes);
 await app.register(workspaceRoutes);
 await app.register(workspaceInviteRoutes);
@@ -86,7 +83,6 @@ await app.register(workspaceAdminExportRoutes);
 app.addHook("onClose", async () => {
   await Promise.allSettled([
     providerHealthScheduler.stop(),
-    providerRecoveryOverrideExpiryScheduler.stop(),
     workspaceInviteExpiryScheduler.stop(),
     workspaceQuotaAlertScheduler.stop()
   ]);
@@ -130,7 +126,6 @@ process.once("SIGINT", (signal) => {
 try {
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
   providerHealthScheduler.start();
-  providerRecoveryOverrideExpiryScheduler.start();
   workspaceInviteExpiryScheduler.start();
   workspaceQuotaAlertScheduler.start();
 } catch (error) {

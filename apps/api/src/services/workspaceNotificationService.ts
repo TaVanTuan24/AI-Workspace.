@@ -88,16 +88,6 @@ export async function getWorkspaceNotifications(
       await linkNotificationEvents(userId, materializedEvents).catch(err => {
         console.error("Failed to link notification events to incidents", err);
       });
-      if (toMaterialize.some((notification) => notification.kind === "no_usable_models")) {
-        await evaluateRecoveryPolicySafely({
-          userId,
-          triggerType: "no_usable_models",
-          triggerRefId: "no_usable_models",
-          severity: "critical",
-          status: "no_usable_models",
-          metadata: { source: "workspace_notification" }
-        });
-      }
     }
   }
 
@@ -240,21 +230,4 @@ function isUiChanged(health: ProviderHealth) {
     health.connectionStatus === "ui_changed" ||
     health.errorCode === "PROVIDER_UI_CHANGED"
   );
-}
-
-async function evaluateRecoveryPolicySafely(input: {
-  userId: string;
-  triggerType: string;
-  triggerRefId: string;
-  provider?: string;
-  severity?: string;
-  status?: string;
-  metadata?: Record<string, unknown>;
-}) {
-  try {
-    const { evaluateProviderRecoveryPolicies } = await import("./providerRecoveryPolicyService.js");
-    await evaluateProviderRecoveryPolicies(input);
-  } catch {
-    // Recovery policy evaluation must not break notification reads.
-  }
 }

@@ -11,7 +11,6 @@ import {
   DatabaseBackup,
   Gauge,
   KeyRound,
-  LifeBuoy,
   RefreshCw,
   SlidersHorizontal,
   TimerReset,
@@ -72,12 +71,6 @@ const quickLinks = [
     label: "Notification preferences",
     description: "Choose which operational alerts appear in the app.",
     icon: Bell
-  },
-  {
-    href: "/settings/provider-recovery",
-    label: "Recovery policies",
-    description: "Configure safe provider incident and drift reactions.",
-    icon: LifeBuoy
   },
   {
     href: "/settings/users",

@@ -8,7 +8,6 @@ export type WorkspaceQuotaResource =
   | 'apiKeys'
   | 'providerConnections'
   | 'webhookDestinations'
-  | 'recoveryPolicies'
   | 'diagnosticsBaselines'
   | 'monthlyApiRequests'
   | 'monthlyInviteEmails';
@@ -20,7 +19,6 @@ export type WorkspaceQuotaSource =
   | 'api_key_create'
   | 'provider_connection_create'
   | 'webhook_destination_create'
-  | 'recovery_policy_create'
   | 'diagnostics_baseline_create'
   | 'openai_compat_chat'
   | 'internal_chat'
@@ -46,7 +44,6 @@ export interface UpdateQuotaPatch {
   maxApiKeys?: number | null;
   maxProviderConnections?: number | null;
   maxWebhookDestinations?: number | null;
-  maxRecoveryPolicies?: number | null;
   maxDiagnosticsBaselines?: number | null;
   maxMonthlyApiRequests?: number | null;
   maxMonthlyInviteEmails?: number | null;
@@ -64,7 +61,6 @@ function getDefaultQuotaLimits() {
     maxApiKeys: null,
     maxProviderConnections: null,
     maxWebhookDestinations: null,
-    maxRecoveryPolicies: null,
     maxDiagnosticsBaselines: null,
     maxMonthlyApiRequests: null,
     maxMonthlyInviteEmails: null,
@@ -113,7 +109,6 @@ export async function getWorkspaceUsageSummary(params: {
     apiKeysCount,
     providerConnectionsCount,
     webhookDestinationsCount,
-    recoveryPoliciesCount,
     diagnosticsBaselinesCount,
     monthlyApiRequestsCount,
     monthlyInviteEmailsCount,
@@ -146,10 +141,6 @@ export async function getWorkspaceUsageSummary(params: {
           ).map((m: any) => m.userId),
         },
       },
-    }),
-    // recoveryPolicies
-    prisma.providerRecoveryPolicy.count({
-      where: { workspaceId },
     }),
     // diagnosticsBaselines
     prisma.providerDiagnosticsBaseline.count({
@@ -193,7 +184,6 @@ export async function getWorkspaceUsageSummary(params: {
       mapStatus('apiKeys', apiKeysCount, quota.maxApiKeys),
       mapStatus('providerConnections', providerConnectionsCount, quota.maxProviderConnections),
       mapStatus('webhookDestinations', webhookDestinationsCount, quota.maxWebhookDestinations),
-      mapStatus('recoveryPolicies', recoveryPoliciesCount, quota.maxRecoveryPolicies),
       mapStatus('diagnosticsBaselines', diagnosticsBaselinesCount, quota.maxDiagnosticsBaselines),
       mapStatus('monthlyApiRequests', monthlyApiRequestsCount, quota.maxMonthlyApiRequests),
       mapStatus('monthlyInviteEmails', monthlyInviteEmailsCount, quota.maxMonthlyInviteEmails),
@@ -336,7 +326,6 @@ export async function updateWorkspaceQuota(params: {
       maxApiKeys: patch.maxApiKeys,
       maxProviderConnections: patch.maxProviderConnections,
       maxWebhookDestinations: patch.maxWebhookDestinations,
-      maxRecoveryPolicies: patch.maxRecoveryPolicies,
       maxDiagnosticsBaselines: patch.maxDiagnosticsBaselines,
       maxMonthlyApiRequests: patch.maxMonthlyApiRequests,
       maxMonthlyInviteEmails: patch.maxMonthlyInviteEmails,

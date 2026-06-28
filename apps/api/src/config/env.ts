@@ -37,7 +37,6 @@ const envSchema = z.object({
   PROVIDER_HEALTH_SCHEDULER_JITTER_SECONDS: z.coerce.number().int().min(0).default(60),
   PROVIDER_HEALTH_SCHEDULER_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(840),
   PROVIDER_HEALTH_SCHEDULER_MAX_USERS_PER_RUN: z.coerce.number().int().positive().default(50),
-  PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED: z.coerce.boolean().default(false),
   WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED: z.coerce.boolean().default(false),
   WORKSPACE_INVITE_EXPIRY_INTERVAL_SECONDS: z.coerce.number().default(3600),
   WORKSPACE_INVITE_EXPIRY_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(60),
@@ -57,9 +56,6 @@ const envSchema = z.object({
   WORKSPACE_INVITE_SMTP_USER: z.string().optional(),
   WORKSPACE_INVITE_SMTP_PASSWORD: z.string().optional(),
   WORKSPACE_INVITE_BASE_URL: z.string().optional(),
-  PROVIDER_RECOVERY_OVERRIDE_EXPIRY_INTERVAL_SECONDS: z.coerce.number().int().min(60).default(300),
-  PROVIDER_RECOVERY_OVERRIDE_EXPIRY_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(120),
-  PROVIDER_RECOVERY_OVERRIDE_EXPIRY_MAX_PER_RUN: z.coerce.number().int().min(1).max(5000).default(500),
   NOTIFICATION_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   NOTIFICATION_WEBHOOK_ALLOW_LOCALHOST: z.coerce.boolean().default(false),
   NOTIFICATION_SECRET_ENCRYPTION_KEY: z.string().optional(),
@@ -91,9 +87,6 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
   const parsed = envSchema.parse({
     ...raw,
     NODE_ENV: raw.NODE_ENV ?? (raw.VITEST ? "test" : undefined),
-    PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED:
-      raw.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED ??
-      (raw.NODE_ENV === "production" ? "true" : undefined),
     WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED:
       raw.WORKSPACE_INVITE_EXPIRY_SCHEDULER_ENABLED ??
       (raw.NODE_ENV === "test" ? "false" : "true"),
@@ -131,11 +124,6 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
   if (parsed.PROVIDER_HEALTH_SCHEDULER_LOCK_TTL_SECONDS > parsed.PROVIDER_HEALTH_SCHEDULER_INTERVAL_SECONDS) {
     warn("PROVIDER_HEALTH_SCHEDULER_LOCK_TTL_SECONDS is greater than the scheduler interval; clamping lock TTL to the interval.");
     parsed.PROVIDER_HEALTH_SCHEDULER_LOCK_TTL_SECONDS = parsed.PROVIDER_HEALTH_SCHEDULER_INTERVAL_SECONDS;
-  }
-
-  if (parsed.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_LOCK_TTL_SECONDS > parsed.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_INTERVAL_SECONDS) {
-    warn("PROVIDER_RECOVERY_OVERRIDE_EXPIRY_LOCK_TTL_SECONDS is greater than the scheduler interval; clamping lock TTL to the interval.");
-    parsed.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_LOCK_TTL_SECONDS = parsed.PROVIDER_RECOVERY_OVERRIDE_EXPIRY_INTERVAL_SECONDS;
   }
 
   if (parsed.WORKSPACE_INVITE_EXPIRY_LOCK_TTL_SECONDS > parsed.WORKSPACE_INVITE_EXPIRY_INTERVAL_SECONDS) {

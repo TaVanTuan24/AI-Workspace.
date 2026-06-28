@@ -47,9 +47,6 @@ export interface SettingsOverview {
     criticalOpenIncidents: number;
     lastIncidentAt: string | null;
   };
-  recovery?: {
-    activeOverrides: number;
-  };
 }
 
 export async function getSettingsOverview(
@@ -61,7 +58,7 @@ export async function getSettingsOverview(
   const from24h = new Date(now - 24 * 60 * 60 * 1000);
   const from7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-  const [providerHealth, modelPreferences, apiKeyStatusCounts, usage24hStatusCounts, providerRateLimited24h, requests7d, openIncidents, activeOverrides] =
+  const [providerHealth, modelPreferences, apiKeyStatusCounts, usage24hStatusCounts, providerRateLimited24h, requests7d, openIncidents] =
     await Promise.all([
       getProviderHealth(userId),
       getModelPreferences(userId),
@@ -96,13 +93,6 @@ export async function getSettingsOverview(
         where: { userId, resolvedAt: null },
         select: { severity: true, startedAt: true },
         orderBy: { startedAt: "desc" }
-      }),
-      prisma.providerRecoveryOverride.count({
-        where: {
-          userId,
-          status: "active",
-          expiresAt: { gt: new Date(now) }
-        }
       })
     ]);
 
@@ -159,9 +149,6 @@ export async function getSettingsOverview(
       openIncidents: openIncidents.length,
       criticalOpenIncidents: openIncidents.filter((inc) => inc.severity === "critical").length,
       lastIncidentAt: openIncidents.length > 0 ? openIncidents[0].startedAt.toISOString() : null
-    },
-    recovery: {
-      activeOverrides
     }
   };
 }

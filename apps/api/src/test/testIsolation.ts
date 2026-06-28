@@ -56,9 +56,6 @@ export async function cleanupTestUserData(userId: string): Promise<void> {
   await prisma.providerDiagnosticsDriftAlert.deleteMany({ where: { userId } });
   await prisma.providerDiagnosticsBaseline.deleteMany({ where: { userId } });
   await prisma.providerDiagnosticsRun.deleteMany({ where: { userId } });
-  await prisma.providerRecoveryOverride.deleteMany({ where: { userId } });
-  await prisma.providerRecoveryPolicyRun.deleteMany({ where: { userId } });
-  await prisma.providerRecoveryPolicy.deleteMany({ where: { userId } });
   await prisma.providerConnection.deleteMany({ where: { userId } });
   await prisma.providerRateLimitSetting.deleteMany({ where: { userId } });
   await prisma.providerLiveSubModelCache.deleteMany({ where: { userId } });

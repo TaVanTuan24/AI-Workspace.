@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { prisma } from "../prisma.js";
-import { 
-  getModelPreferences, 
-  updateModelPreferences, 
-  getModelTemporaryDisable,
+import {
+  getModelPreferences,
+  updateModelPreferences,
   resolveDefaultModel,
   isModelEnabled,
-  setDefaultModel 
+  setDefaultModel
 } from "../modelPreferenceService.js";
 import { withTestUserScope } from "../../test/testIsolation.js";
-import { createRecoveryOverride } from "../providerRecoveryOverrideService.js";
 
 vi.mock("../providerHealthService.js", () => {
   return {
@@ -134,99 +132,4 @@ describe("modelPreferenceService", () => {
     expect(resolved).toBe("gemini-web");
   });
 
-  it("marks temporarily disabled models unusable without changing permanent preference", async () => {
-    await updateModelPreferences(userId, "test-ws", {
-      autoSelectFirstUsable: true,
-      models: [
-        { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
-      ]
-    });
-    await createRecoveryOverride({
-      userId,
-      actionType: "disable_model_temporarily",
-      provider: "chatgpt",
-      modelId: "chatgpt-web",
-      durationMinutes: 30,
-      overrideState: { modelId: "chatgpt-web" }
-    });
-
-    const prefs = await getModelPreferences(userId);
-    const chatgpt = prefs.models.find(m => m.modelId === "chatgpt-web");
-    expect(chatgpt?.enabled).toBe(true);
-    expect(chatgpt?.isUsable).toBe(false);
-    expect(chatgpt?.recovery.temporarilyDisabled).toBe(true);
-
-    const rawPref = await prisma.userModelPreference.findFirstOrThrow({ where: { userId, modelId: "chatgpt-web" } });
-    expect(rawPref.enabled).toBe(true);
-    expect(rawPref.isDefault).toBe(true);
-  });
-
-  it("ignores past-due active temporary disables before scheduler cleanup", async () => {
-    await updateModelPreferences(userId, "test-ws", {
-      autoSelectFirstUsable: true,
-      models: [
-        { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
-      ]
-    });
-    await prisma.providerRecoveryOverride.create({
-      data: {
-        userId,
-        actionType: "disable_model_temporarily",
-        provider: "chatgpt",
-        modelId: "chatgpt-web",
-        status: "active",
-        overrideState: JSON.stringify({ modelId: "chatgpt-web" }),
-        previousState: JSON.stringify({ type: "virtual_override" }),
-        startsAt: new Date(Date.now() - 120_000),
-        expiresAt: new Date(Date.now() - 60_000)
-      }
-    });
-
-    const prefs = await getModelPreferences(userId);
-    const chatgpt = prefs.models.find(m => m.modelId === "chatgpt-web");
-    expect(chatgpt?.enabled).toBe(true);
-    expect(chatgpt?.isUsable).toBe(true);
-    expect(chatgpt?.recovery.temporarilyDisabled).toBe(false);
-    await expect(getModelTemporaryDisable(userId, "chatgpt-web")).resolves.toBeNull();
-  });
-
-  it("prefers temporary fallback provider for automatic selection", async () => {
-    await updateModelPreferences(userId, "test-ws", {
-      autoSelectFirstUsable: true,
-      models: [
-        { modelId: "chatgpt-web", enabled: true, isDefault: true, priority: 10 },
-        { modelId: "claude-web", enabled: true, isDefault: false, priority: 20 }
-      ]
-    });
-    await createRecoveryOverride({
-      userId,
-      actionType: "prefer_fallback_provider",
-      provider: "chatgpt",
-      durationMinutes: 30,
-      overrideState: {
-        onlyIfProvider: "chatgpt",
-        fallbackProviderOrder: ["claude", "gemini"]
-      }
-    });
-
-    await expect(resolveDefaultModel(userId)).resolves.toBe("claude-web");
-  });
-
-  it("blocks provider only when degraded mode is block_for_duration", async () => {
-    await createRecoveryOverride({
-      userId,
-      actionType: "mark_provider_temporarily_degraded",
-      provider: "claude",
-      durationMinutes: 30,
-      overrideState: { mode: "block_for_duration" }
-    });
-
-    const prefs = await getModelPreferences(userId);
-    const claude = prefs.models.find(m => m.modelId === "claude-web");
-    expect(claude?.isUsable).toBe(false);
-    expect(claude?.recovery.providerDegraded).toBe(true);
-    expect(claude?.recovery.degradedMode).toBe("block_for_duration");
-  });
 });

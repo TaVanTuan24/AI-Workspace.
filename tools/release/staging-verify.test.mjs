@@ -28,7 +28,6 @@ describe("staging-verify", () => {
       if (req.url === "/secret") return json(res, 200, { storageState: {} });
       if (req.url === "/v1/models") return json(res, 200, { object: "list", data: [] });
       if (req.url === "/settings/overview") return json(res, 200, { providers: [] });
-      if (req.url === "/settings/provider-recovery/scheduler-status") return json(res, 200, { data: { enabled: false } });
       if (req.url === "/settings/provider-health/incidents?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/provider-health/diagnostics-runs?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/notification-delivery/dead-letters?limit=10") return json(res, 200, { deadLetters: [] });

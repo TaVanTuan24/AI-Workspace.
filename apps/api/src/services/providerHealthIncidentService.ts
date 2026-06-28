@@ -87,17 +87,6 @@ export async function recordHealthObservation(
           }))
         }
       });
-      if (updated.occurrenceCount === 3) {
-        await evaluateRecoveryPolicySafely({
-          userId,
-          triggerType: "provider_incident_repeated",
-          triggerRefId: updated.id,
-          provider: updated.provider,
-          severity: updated.severity,
-          status: updated.status,
-          metadata: { source: context?.source, statusCategory: updated.status }
-        });
-      }
       return updated;
     } else {
       // Transition to a new status: resolve the old one, and create a new one
@@ -131,26 +120,6 @@ export async function recordHealthObservation(
       }))
     }
   });
-  await evaluateRecoveryPolicySafely({
-    userId,
-    triggerType: "provider_incident_opened",
-    triggerRefId: created.id,
-    provider: created.provider,
-    severity: created.severity,
-    status: created.status,
-    metadata: { source: context?.source, statusCategory: created.status }
-  });
-  if (created.severity === "critical") {
-    await evaluateRecoveryPolicySafely({
-      userId,
-      triggerType: "provider_incident_critical",
-      triggerRefId: created.id,
-      provider: created.provider,
-      severity: created.severity,
-      status: created.status,
-      metadata: { source: context?.source, statusCategory: created.status }
-    });
-  }
   return created;
 }
 
@@ -248,21 +217,4 @@ export async function getProviderHealthIncident(userId: string, incidentId: stri
       userId
     }
   });
-}
-
-async function evaluateRecoveryPolicySafely(input: {
-  userId: string;
-  triggerType: string;
-  triggerRefId: string;
-  provider?: string;
-  severity?: string;
-  status?: string;
-  metadata?: Record<string, unknown>;
-}) {
-  try {
-    const { evaluateProviderRecoveryPolicies } = await import("./providerRecoveryPolicyService.js");
-    await evaluateProviderRecoveryPolicies(input);
-  } catch (error) {
-    console.error("Provider recovery policy evaluation failed", { triggerType: input.triggerType });
-  }
 }

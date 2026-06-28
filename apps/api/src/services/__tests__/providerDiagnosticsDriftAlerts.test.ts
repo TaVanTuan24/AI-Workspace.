@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { providerDiagnosticsDriftAlertService } from "../providerDiagnosticsDriftAlertService.js";
 import { providerDiagnosticsBaselineService } from "../providerDiagnosticsBaselineService.js";
 import { providerDiagnosticsHistoryService } from "../providerDiagnosticsHistoryService.js";
-import { createProviderRecoveryPolicy } from "../providerRecoveryPolicyService.js";
 import { makeTestRunId, withTestUserScope } from "../../test/testIsolation.js";
 import { prisma } from "../prisma.js";
 
@@ -122,55 +121,4 @@ describe("providerDiagnosticsDriftAlertService", () => {
     expect(resolved.metadata.resolutionNote).toBe("UI changed, expected");
   });
 
-  it("evaluates recovery policies when a new drift alert is persisted", async () => {
-    await createProviderRecoveryPolicy(userId, {
-      name: "Drift notify",
-      triggerTypes: ["diagnostics_drift_alert_error"],
-      providers: ["chatgpt"],
-      actions: [{ type: "notify_in_app", enabled: true }]
-    });
-
-    const runLeft = await providerDiagnosticsHistoryService.recordDiagnosticsRun({
-      userId,
-      provider: "chatgpt",
-      startedAt: new Date(),
-      result: {
-        provider: "chatgpt",
-        status: "ok",
-        candidates: [
-          { kind: "composer", selector: "textarea", confidence: 1, reason: "", visible: true },
-        ],
-        missingKinds: [],
-        warnings: [],
-      },
-      source: "test"
-    });
-
-    await providerDiagnosticsBaselineService.createBaselineFromRun({
-      userId,
-      runId: runLeft.id,
-      name: "Baseline",
-      setActive: true
-    });
-
-    const runDrifted = await providerDiagnosticsHistoryService.recordDiagnosticsRun({
-      userId,
-      provider: "chatgpt",
-      startedAt: new Date(),
-      result: {
-        provider: "chatgpt",
-        status: "ok",
-        candidates: [],
-        missingKinds: ["composer"],
-        warnings: [],
-      },
-      source: "test"
-    });
-
-    await providerDiagnosticsDriftAlertService.evaluateAfterDiagnosticsRun({ userId, runId: runDrifted.id });
-
-    const policyRun = await prisma.providerRecoveryPolicyRun.findFirst({ where: { userId } });
-    expect(policyRun?.triggerType).toBe("diagnostics_drift_alert_error");
-    expect(policyRun?.status).toBe("success");
-  });
 });

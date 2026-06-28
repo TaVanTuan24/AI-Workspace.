@@ -86,8 +86,7 @@ describe("staging-env", () => {
         REDIS_URL: "redis://redis:6379",
         API_BASE_URL: "http://localhost:4000",
         NEXT_PUBLIC_API_BASE_URL: "http://localhost:4000",
-        PROVIDER_HEALTH_SCHEDULER_ENABLED: "false",
-        PROVIDER_RECOVERY_OVERRIDE_EXPIRY_SCHEDULER_ENABLED: "false"
+        PROVIDER_HEALTH_SCHEDULER_ENABLED: "false"
       }
     });
 

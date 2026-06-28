@@ -140,48 +140,6 @@ describe("providerHealthIncidentsRoutes", () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it("should fetch runbook for an incident", async () => {
-    const inc = await prisma.providerHealthIncident.create({
-      data: {
-        id: randomUUID(),
-        userId,
-        provider: "chatgpt",
-        status: "requires_login",
-        severity: "warning",
-        fingerprint: "runbook-test"
-      }
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: `/settings/provider-health/incidents/${inc.id}/runbook`,
-      headers: { "x-local-user-id": userId }
-    });
-
-    expect(response.statusCode).toBe(200);
-    const json = response.json();
-    expect(json.data.provider).toBe("chatgpt");
-    expect(json.data.status).toBe("requires_login");
-    expect(json.data.recommendedSteps.length).toBeGreaterThan(0);
-    // Ensure no secrets are leaked in actions
-    const str = JSON.stringify(json.data);
-    expect(str).not.toContain("secret");
-  });
-
-  it("should fetch generic runbook without incident", async () => {
-    const response = await app.inject({
-      method: "GET",
-      url: `/settings/provider-health/runbook?provider=gemini&status=error`,
-      headers: { "x-local-user-id": userId }
-    });
-
-    expect(response.statusCode).toBe(200);
-    const json = response.json();
-    expect(json.data.provider).toBe("gemini");
-    expect(json.data.status).toBe("error");
-    expect(json.data.recommendedSteps.length).toBeGreaterThan(0);
-  });
-
   // Since health-check and ui-diagnostics POST actions would trigger live calls,
   // we will just test that they return 404 for wrong incident, 
   // or return expected error if not fully mocked, testing route coverage.
