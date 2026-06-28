@@ -42,6 +42,13 @@ export async function getProviderHealth(userId: string): Promise<ProviderHealth[
     else if (connectionStatus === "expired") healthStatus = "expired";
     else if (connectionStatus === "error") healthStatus = "error";
 
+    // A chat turn that hit stale selectors marks the connection with this error
+    // code. Surface it as ui_changed even though the session itself is still
+    // "connected", so the user is prompted to update selectors without a refresh.
+    if (connectionStatus === "connected" && conn?.errorCode === "PROVIDER_UI_CHANGED") {
+      healthStatus = "ui_changed";
+    }
+
     const isUsable =
       def.readiness === "ready" &&
       def.capabilities.includes("send_message") &&

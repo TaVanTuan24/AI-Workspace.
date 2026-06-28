@@ -63,6 +63,28 @@ describe("providerHealthService", () => {
     expect(chatgpt?.requiresLogin).toBe(false);
   });
 
+  it("surfaces a chat-time UI change as ui_changed without a refresh", async () => {
+    await prisma.providerConnection.create({
+      data: {
+        userId,
+        provider: "chatgpt",
+        status: "connected",
+        browserProfileId: "dummy",
+        errorCode: "PROVIDER_UI_CHANGED",
+        errorMessageSafe: "ChatGPT composer was not found."
+      }
+    });
+
+    const healths = await getProviderHealth(userId);
+    const chatgpt = healths.find(h => h.provider === "chatgpt");
+
+    // The session is still "connected" but the stale-selector marker downgrades health.
+    expect(chatgpt?.connectionStatus).toBe("connected");
+    expect(chatgpt?.healthStatus).toBe("ui_changed");
+    expect(chatgpt?.isUsable).toBe(false);
+    expect(chatgpt?.errorCode).toBe("PROVIDER_UI_CHANGED");
+  });
+
   it("should return requires_login when refresh is called without session", async () => {
     await prisma.providerConnection.create({
       data: {

@@ -115,12 +115,14 @@ export class GeminiAdapter extends BaseProviderAdapter {
 
     let lastText = "";
     let lastChangeAt = Date.now();
+    let sawAnyResponse = false;
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < RESPONSE_TOTAL_TIMEOUT_MS) {
       await page.waitForTimeout(RESPONSE_POLL_INTERVAL_MS);
       const current = await this.latestResponseText(page);
       const normalizedCurrent = this.normalizeResponseText(current);
+      if (current && current.trim()) sawAnyResponse = true;
 
       if (
         normalizedCurrent &&
@@ -163,6 +165,17 @@ export class GeminiAdapter extends BaseProviderAdapter {
         jobId: input.jobId,
         text: lastText,
         conversationUrl: this.captureConversationUrl(page)
+      };
+      return;
+    }
+
+    if (!sawAnyResponse) {
+      yield {
+        type: "error",
+        provider: this.providerId,
+        jobId: input.jobId,
+        errorCode: "PROVIDER_UI_CHANGED",
+        message: "Gemini produced no visible response area. The provider UI may have changed."
       };
       return;
     }

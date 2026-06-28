@@ -121,6 +121,7 @@ export class ClaudeAdapter extends BaseProviderAdapter {
 
     let lastText = "";
     let lastChangeAt = Date.now();
+    let sawAnyResponse = false;
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < RESPONSE_TOTAL_TIMEOUT_MS) {
@@ -148,6 +149,7 @@ export class ClaudeAdapter extends BaseProviderAdapter {
 
       const current = await this.latestResponseText(page);
       const normalizedCurrent = this.normalizeResponseText(current);
+      if (current && current.trim()) sawAnyResponse = true;
 
       if (
         normalizedCurrent &&
@@ -173,6 +175,7 @@ export class ClaudeAdapter extends BaseProviderAdapter {
 
       const stopVisible = await this.firstVisible(page, this.selectors.stopButtonCandidates, 250);
       const sendVisible = await this.firstVisible(page, this.selectors.sendButtonCandidates, 250);
+      if (stopVisible) sawAnyResponse = true;
       if (lastText && !stopVisible && sendVisible && Date.now() - lastChangeAt >= RESPONSE_IDLE_TIMEOUT_MS) {
         yield {
           type: "message_complete",
@@ -203,6 +206,17 @@ export class ClaudeAdapter extends BaseProviderAdapter {
         jobId: input.jobId,
         text: lastText,
         conversationUrl: this.captureConversationUrl(page)
+      };
+      return;
+    }
+
+    if (!sawAnyResponse) {
+      yield {
+        type: "error",
+        provider: this.providerId,
+        jobId: input.jobId,
+        errorCode: "PROVIDER_UI_CHANGED",
+        message: "Claude produced no visible response area. The provider UI may have changed."
       };
       return;
     }

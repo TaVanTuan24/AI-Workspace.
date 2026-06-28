@@ -227,7 +227,9 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
 
       await prisma.providerConnection.update({
         where: { id: connection.id },
-        data: { lastUsedAt: new Date(), lastValidatedAt: new Date() }
+        // A successful send proves the provider works now; clear any stale
+        // UI-change / error marker recorded by a previous failed turn.
+        data: { lastUsedAt: new Date(), lastValidatedAt: new Date(), errorCode: null, errorMessageSafe: null }
       });
 
       await prisma.automationJob.update({
@@ -296,6 +298,18 @@ async function failJob(input: ChatJobPayload, errorCode: ErrorCode, message: str
       errorMessageSafe: message
     }
   }).catch((err) => console.error("Failed to persist failed job status", { jobId: input.jobId, err }));
+
+  // Surface a UI-change discovered during chat to the health/notification system
+  // (which otherwise only updates on a manual/scheduled health refresh) by marking
+  // the connection. getProviderHealth reads this without spawning a browser.
+  if (errorCode === "PROVIDER_UI_CHANGED") {
+    await prisma.providerConnection
+      .update({
+        where: { userId_provider: { userId: input.userId, provider: input.provider } },
+        data: { errorCode, errorMessageSafe: message, lastValidatedAt: new Date() }
+      })
+      .catch(() => {});
+  }
 
   await publisher.publish(input.jobId, {
     type: "error",

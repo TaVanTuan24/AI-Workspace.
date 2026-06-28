@@ -217,6 +217,7 @@ Disabled models are rejected with a safe `model_disabled` error without launchin
 - **Health/readiness** — `GET /v1/models` and `/settings/provider-health` report whether each model is usable. Health validation checks the encrypted session only; it never sends prompts. Results are cached (`PROVIDER_HEALTH_TTL_SECONDS`, default 300).
 - **Scheduled health checks** — optional background validation (`PROVIDER_HEALTH_SCHEDULER_ENABLED`, off by default), using a Redis lock so replicas don't overlap. Run once manually: `corepack pnpm provider-health:run-once -- --json`.
 - **Incidents and UI diagnostics** — provider health incidents are tracked per user, and safe DOM diagnostics (no screenshots, no raw HTML, no prompts) detect selector drift when a provider UI changes. Diagnostics actions are available from `/settings/provider-health`.
+- **Chat-time UI-change detection (resilience)** — selectors are tried in ranked order; if a chat turn finds no composer or renders no response area, it is reported as `PROVIDER_UI_CHANGED` (not a generic timeout). The worker marks the connection, and `getProviderHealth` (DB-only, no browser) immediately surfaces it as `ui_changed` / not usable across the banner, `/settings/provider-health`, `/settings/models`, and `/v1/models` — without waiting for a manual health refresh. A subsequent successful turn clears the marker. Update selectors in `packages/provider-adapters/src/<provider>/selectors.ts` (use `smoke:<provider>:diagnose` to find candidates).
 
 ---
 
