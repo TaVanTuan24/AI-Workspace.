@@ -72,6 +72,31 @@ export async function getProviderHealth(userId: string): Promise<ProviderHealth[
   });
 }
 
+/**
+ * Browser-free verdict on whether a saved Playwright storageState is certainly
+ * expired, so a health refresh can skip launching Chromium.
+ *
+ * Deliberately conservative — returns true only when there is no chance the
+ * session still works:
+ *  - the cookie jar is empty (nothing to authenticate with), or
+ *  - every cookie has a concrete expiry (`expires > 0`) and all are in the past.
+ *
+ * A single session cookie (`expires <= 0`) or any future-dated cookie makes it
+ * return false, so the real browser validation still runs. Unknown shapes also
+ * return false (never short-circuit on uncertainty).
+ */
+export function isSessionLikelyExpired(sessionState: unknown, nowMs: number): boolean {
+  if (typeof sessionState !== "object" || sessionState === null) return false;
+  const cookies = (sessionState as { cookies?: unknown }).cookies;
+  if (!Array.isArray(cookies)) return false;
+  if (cookies.length === 0) return true;
+  const nowSec = Math.floor(nowMs / 1000);
+  return cookies.every((cookie) => {
+    const expires = (cookie as { expires?: unknown }).expires;
+    return typeof expires === "number" && expires > 0 && expires < nowSec;
+  });
+}
+
 export async function refreshProviderHealth(userId: string, provider: ProviderId): Promise<ProviderHealth> {
   const registered = providerRegistry.get(provider);
   const def = registered.definition;
@@ -106,31 +131,41 @@ export async function refreshProviderHealth(userId: string, provider: ProviderId
   let newErrorMessage: string | null = null;
   let context;
 
-  try {
-    context = await browserManager.createContextFromStorageState({
-      userId,
-      provider,
-      storageState: sessionState
-    });
+  // Browser-free pre-check: if the saved cookie jar is already, definitively
+  // expired, skip the (expensive) Chromium spawn and report requires_login
+  // directly. Conservative on purpose — only short-circuits when there is no
+  // chance the session is still valid (see isSessionLikelyExpired).
+  if (isSessionLikelyExpired(sessionState, Date.now())) {
+    newStatus = "requires_login";
+    newErrorCode = "SESSION_EXPIRED";
+    newErrorMessage = "Saved session cookies have expired. Please reconnect.";
+  } else {
+    try {
+      context = await browserManager.createContextFromStorageState({
+        userId,
+        provider,
+        storageState: sessionState
+      });
 
-    const adapter = registered.adapter;
-    const authStatus = await Promise.race([
-      adapter.validateSession(context),
-      new Promise<"error">((_, reject) => setTimeout(() => reject(new Error("Timeout")), env.PROVIDER_HEALTH_TIMEOUT_MS))
-    ]) as any;
+      const adapter = registered.adapter;
+      const authStatus = await Promise.race([
+        adapter.validateSession(context),
+        new Promise<"error">((_, reject) => setTimeout(() => reject(new Error("Timeout")), env.PROVIDER_HEALTH_TIMEOUT_MS))
+      ]) as any;
 
-    newStatus = authStatus;
-    if (authStatus !== "connected") {
-      newErrorCode = authStatus === "requires_login" ? "SESSION_EXPIRED" : "MANUAL_ACTION_REQUIRED";
-      newErrorMessage = "Please complete login or verification in the browser window.";
-    }
-  } catch (err: any) {
-    newStatus = "error";
-    newErrorCode = err.message === "Timeout" ? "TIMEOUT" : "UNKNOWN_SAFE_ERROR";
-    newErrorMessage = "Failed to validate session.";
-  } finally {
-    if (context) {
-      await context.close().catch(() => {});
+      newStatus = authStatus;
+      if (authStatus !== "connected") {
+        newErrorCode = authStatus === "requires_login" ? "SESSION_EXPIRED" : "MANUAL_ACTION_REQUIRED";
+        newErrorMessage = "Please complete login or verification in the browser window.";
+      }
+    } catch (err: any) {
+      newStatus = "error";
+      newErrorCode = err.message === "Timeout" ? "TIMEOUT" : "UNKNOWN_SAFE_ERROR";
+      newErrorMessage = "Failed to validate session.";
+    } finally {
+      if (context) {
+        await context.close().catch(() => {});
+      }
     }
   }
 

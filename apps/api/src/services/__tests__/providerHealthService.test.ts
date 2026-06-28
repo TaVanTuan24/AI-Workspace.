@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { prisma } from "../prisma.js";
-import { getProviderHealth, refreshProviderHealth } from "../providerHealthService.js";
+import { getProviderHealth, refreshProviderHealth, isSessionLikelyExpired } from "../providerHealthService.js";
 import { providerRegistry } from "../providerRegistry.js";
 import { browserManager } from "../browserManager.js";
 import { withTestUserScope } from "../../test/testIsolation.js";
@@ -83,6 +83,34 @@ describe("providerHealthService", () => {
     expect(chatgpt?.healthStatus).toBe("ui_changed");
     expect(chatgpt?.isUsable).toBe(false);
     expect(chatgpt?.errorCode).toBe("PROVIDER_UI_CHANGED");
+  });
+
+  describe("isSessionLikelyExpired (browser-free pre-check)", () => {
+    const now = 1_800_000_000_000; // fixed ms
+    const past = Math.floor(now / 1000) - 3600;
+    const future = Math.floor(now / 1000) + 3600;
+
+    it("treats an empty cookie jar as expired", () => {
+      expect(isSessionLikelyExpired({ cookies: [] }, now)).toBe(true);
+    });
+
+    it("is expired only when every cookie has a concrete past expiry", () => {
+      expect(isSessionLikelyExpired({ cookies: [{ name: "a", expires: past }, { name: "b", expires: past }] }, now)).toBe(true);
+    });
+
+    it("is NOT expired if any cookie is future-dated", () => {
+      expect(isSessionLikelyExpired({ cookies: [{ name: "a", expires: past }, { name: "b", expires: future }] }, now)).toBe(false);
+    });
+
+    it("is NOT expired if any cookie is a session cookie (expires <= 0)", () => {
+      expect(isSessionLikelyExpired({ cookies: [{ name: "a", expires: past }, { name: "s", expires: -1 }] }, now)).toBe(false);
+    });
+
+    it("never short-circuits on unknown shapes", () => {
+      expect(isSessionLikelyExpired(null, now)).toBe(false);
+      expect(isSessionLikelyExpired({}, now)).toBe(false);
+      expect(isSessionLikelyExpired({ cookies: "nope" }, now)).toBe(false);
+    });
   });
 
   it("should return requires_login when refresh is called without session", async () => {
