@@ -5,9 +5,6 @@ export interface NotificationPreferences {
   notifyNoUsableModels: boolean;
   notifyProviderLimitSpikes: boolean;
   providerLimitSpikeThreshold24h: number;
-  notifyWorkspaceQuotaWarnings: boolean;
-  notifyWorkspaceQuotaExceeded: boolean;
-  workspaceQuotaWarningThresholdPercent: number;
 }
 
 export interface UpdateNotificationPreferencesInput {
@@ -15,19 +12,13 @@ export interface UpdateNotificationPreferencesInput {
   notifyNoUsableModels?: boolean;
   notifyProviderLimitSpikes?: boolean;
   providerLimitSpikeThreshold24h?: number;
-  notifyWorkspaceQuotaWarnings?: boolean;
-  notifyWorkspaceQuotaExceeded?: boolean;
-  workspaceQuotaWarningThresholdPercent?: number;
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
   notifyProviderSessionIssues: true,
   notifyNoUsableModels: true,
   notifyProviderLimitSpikes: true,
-  providerLimitSpikeThreshold24h: 10,
-  notifyWorkspaceQuotaWarnings: true,
-  notifyWorkspaceQuotaExceeded: true,
-  workspaceQuotaWarningThresholdPercent: 90
+  providerLimitSpikeThreshold24h: 10
 };
 
 export function defaultNotificationPreferences(): NotificationPreferences {
@@ -55,10 +46,7 @@ export async function updateNotificationPreferences(
     ...(input.notifyProviderSessionIssues !== undefined ? { notifyProviderSessionIssues: input.notifyProviderSessionIssues } : {}),
     ...(input.notifyNoUsableModels !== undefined ? { notifyNoUsableModels: input.notifyNoUsableModels } : {}),
     ...(input.notifyProviderLimitSpikes !== undefined ? { notifyProviderLimitSpikes: input.notifyProviderLimitSpikes } : {}),
-    ...(input.providerLimitSpikeThreshold24h !== undefined ? { providerLimitSpikeThreshold24h: input.providerLimitSpikeThreshold24h } : {}),
-    ...(input.notifyWorkspaceQuotaWarnings !== undefined ? { notifyWorkspaceQuotaWarnings: input.notifyWorkspaceQuotaWarnings } : {}),
-    ...(input.notifyWorkspaceQuotaExceeded !== undefined ? { notifyWorkspaceQuotaExceeded: input.notifyWorkspaceQuotaExceeded } : {}),
-    ...(input.workspaceQuotaWarningThresholdPercent !== undefined ? { workspaceQuotaWarningThresholdPercent: input.workspaceQuotaWarningThresholdPercent } : {})
+    ...(input.providerLimitSpikeThreshold24h !== undefined ? { providerLimitSpikeThreshold24h: input.providerLimitSpikeThreshold24h } : {})
   };
   const settings = await prisma.userSettings.upsert({
     where: { userId },
@@ -79,12 +67,6 @@ export function validateNotificationPreferences(input: UpdateNotificationPrefere
       throw new Error("providerLimitSpikeThreshold24h must be an integer from 1 to 10000.");
     }
   }
-  if (input.workspaceQuotaWarningThresholdPercent !== undefined) {
-    const threshold = input.workspaceQuotaWarningThresholdPercent;
-    if (!Number.isInteger(threshold) || threshold < 50 || threshold > 99) {
-      throw new Error("workspaceQuotaWarningThresholdPercent must be an integer from 50 to 99.");
-    }
-  }
 }
 
 function mapPreferences(settings: {
@@ -92,17 +74,11 @@ function mapPreferences(settings: {
   notifyNoUsableModels: boolean;
   notifyProviderLimitSpikes: boolean;
   providerLimitSpikeThreshold24h: number;
-  notifyWorkspaceQuotaWarnings: boolean;
-  notifyWorkspaceQuotaExceeded: boolean;
-  workspaceQuotaWarningThresholdPercent: number;
 }): NotificationPreferences {
   return {
     notifyProviderSessionIssues: settings.notifyProviderSessionIssues,
     notifyNoUsableModels: settings.notifyNoUsableModels,
     notifyProviderLimitSpikes: settings.notifyProviderLimitSpikes,
-    providerLimitSpikeThreshold24h: settings.providerLimitSpikeThreshold24h,
-    notifyWorkspaceQuotaWarnings: settings.notifyWorkspaceQuotaWarnings,
-    notifyWorkspaceQuotaExceeded: settings.notifyWorkspaceQuotaExceeded,
-    workspaceQuotaWarningThresholdPercent: settings.workspaceQuotaWarningThresholdPercent
+    providerLimitSpikeThreshold24h: settings.providerLimitSpikeThreshold24h
   };
 }

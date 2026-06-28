@@ -7,6 +7,20 @@
 - Replaced the Grok web provider adapter with a Claude (claude.ai) web provider adapter. Supported providers are now ChatGPT, Gemini, and Claude.
 - Renamed the `PROVIDER_RATE_LIMIT_GROK_PER_MINUTE` environment variable to `PROVIDER_RATE_LIMIT_CLAUDE_PER_MINUTE` and the `grok-web` OpenAI-compatible model id to `claude-web`.
 
+### Removed — Multi-workspace / org governance
+
+The multi-tenant workspace layer introduced in 0.3.0 has been fully removed. The app is now single-user and local-first; role-based permissions (`User.role` + `requirePermission`) are retained as they are orthogonal to workspaces. This reverses the "Workspace Governance & Admin Observability" surface documented in the 0.3.0 release notes.
+
+- **Schema/data:** dropped the `workspaces`, `workspace_memberships`, `workspace_invites`, `workspace_invite_delivery_attempts`, `workspace_quotas`, `workspace_quota_events`, and `user_role_audit_events` tables, and removed `workspace_id` from all remaining models. Removed the `notify_workspace_quota_*` / `workspace_quota_warning_threshold_percent` columns from `user_settings`.
+- **API:** removed the workspace, users, invites, quota, activity, admin-overview/export, and scheduler routes/services; the `userManagementService`, invite email delivery, and `workspaceContext`; and the `governance-backfill`, `expire-invites`, `quota-alerts`, and `quota-events-cleanup` CLIs. The local user is now provisioned as `owner`; quota enforcement (`assertWorkspaceQuota`) is gone.
+- **Web:** removed the workspace-overview, activity, quota, schedulers, and users settings pages, the workspace switcher, invite acceptance, and the now-defunct "Workspace Quota Alerts" notification preferences.
+- **Config:** removed all `WORKSPACE_*` environment variables (invite expiry/quota-alert schedulers, invite email/SMTP, quota event retention) and the invite/quota background schedulers.
+
+### Migrations
+
+- `20260628140847_remove_workspace_org`
+- `20260628150000_remove_quota_notification_prefs`
+
 ## 0.3.0 - 2026-06-23
 
 Please see the [Release Notes for 0.3.0](docs/RELEASE_NOTES_0.3.0.md) for full details on Workspace Governance & Admin Observability.

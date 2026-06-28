@@ -457,9 +457,6 @@ export interface NotificationPreferences {
   notifyNoUsableModels: boolean;
   notifyProviderLimitSpikes: boolean;
   providerLimitSpikeThreshold24h: number;
-  notifyWorkspaceQuotaWarnings: boolean;
-  notifyWorkspaceQuotaExceeded: boolean;
-  workspaceQuotaWarningThresholdPercent: number;
 }
 
 export async function getNotificationPreferences(): Promise<{ preferences: NotificationPreferences }> {

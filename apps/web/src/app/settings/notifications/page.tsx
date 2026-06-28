@@ -16,16 +16,12 @@ const defaultPreferences: NotificationPreferences = {
   notifyProviderSessionIssues: true,
   notifyNoUsableModels: true,
   notifyProviderLimitSpikes: true,
-  providerLimitSpikeThreshold24h: 10,
-  notifyWorkspaceQuotaWarnings: true,
-  notifyWorkspaceQuotaExceeded: true,
-  workspaceQuotaWarningThresholdPercent: 90
+  providerLimitSpikeThreshold24h: 10
 };
 
 export default function NotificationPreferencesPage() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [thresholdDraft, setThresholdDraft] = useState("10");
-  const [quotaWarningThresholdDraft, setQuotaWarningThresholdDraft] = useState("90");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -80,7 +76,6 @@ export default function NotificationPreferencesPage() {
       const data = await getNotificationPreferences();
       setPreferences(data.preferences);
       setThresholdDraft(String(data.preferences.providerLimitSpikeThreshold24h));
-      setQuotaWarningThresholdDraft(String(data.preferences.workspaceQuotaWarningThresholdPercent));
     } catch (err: any) {
       setError(err.message || "Failed to load notification preferences");
     } finally {
@@ -92,15 +87,10 @@ export default function NotificationPreferencesPage() {
     setPreferences((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function savePreferences(input: NotificationPreferences = preferences, thresholdValue = thresholdDraft, quotaWarningThresholdValue = quotaWarningThresholdDraft) {
+  async function savePreferences(input: NotificationPreferences = preferences, thresholdValue = thresholdDraft) {
     const threshold = Number(thresholdValue);
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 10_000) {
       setError("Provider limit spike threshold must be a whole number from 1 to 10000.");
-      return;
-    }
-    const quotaWarningThreshold = Number(quotaWarningThresholdValue);
-    if (!Number.isInteger(quotaWarningThreshold) || quotaWarningThreshold < 50 || quotaWarningThreshold > 99) {
-      setError("Workspace quota warning threshold must be a whole number from 50 to 99.");
       return;
     }
 
@@ -110,12 +100,10 @@ export default function NotificationPreferencesPage() {
       setNotice("");
       const data = await updateNotificationPreferences({
         ...input,
-        providerLimitSpikeThreshold24h: threshold,
-        workspaceQuotaWarningThresholdPercent: quotaWarningThreshold
+        providerLimitSpikeThreshold24h: threshold
       });
       setPreferences(data.preferences);
       setThresholdDraft(String(data.preferences.providerLimitSpikeThreshold24h));
-      setQuotaWarningThresholdDraft(String(data.preferences.workspaceQuotaWarningThresholdPercent));
       setNotice("Notification preferences saved.");
     } catch (err: any) {
       setError(err.message || "Failed to save notification preferences");
@@ -127,8 +115,7 @@ export default function NotificationPreferencesPage() {
   async function resetDefaults() {
     setPreferences(defaultPreferences);
     setThresholdDraft(String(defaultPreferences.providerLimitSpikeThreshold24h));
-    setQuotaWarningThresholdDraft(String(defaultPreferences.workspaceQuotaWarningThresholdPercent));
-    await savePreferences(defaultPreferences, String(defaultPreferences.providerLimitSpikeThreshold24h), String(defaultPreferences.workspaceQuotaWarningThresholdPercent));
+    await savePreferences(defaultPreferences, String(defaultPreferences.providerLimitSpikeThreshold24h));
   }
 
   return (
@@ -220,44 +207,6 @@ export default function NotificationPreferencesPage() {
                   Example: threshold 10 shows an alert when ChatGPT has at least 10 provider-limit hits in 24h.
                 </span>
               </label>
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-slate-800 bg-slate-900">
-            <div className="border-b border-slate-800 px-5 py-4">
-              <h2 className="text-lg font-semibold text-slate-100">Workspace Quota Alerts</h2>
-            </div>
-            <div className="space-y-5 p-5">
-              <ToggleRow
-                label="Quota warning alerts"
-                description="Shown when a resource is nearing its configured limit."
-                checked={preferences.notifyWorkspaceQuotaWarnings}
-                onChange={(checked) => updateDraft("notifyWorkspaceQuotaWarnings", checked)}
-              />
-              <label className="block max-w-xs">
-                <span className="text-sm font-medium text-slate-300">Warning Threshold %</span>
-                <input
-                  type="number"
-                  min={50}
-                  max={99}
-                  value={quotaWarningThresholdDraft}
-                  onChange={(event) => setQuotaWarningThresholdDraft(event.target.value)}
-                  disabled={!preferences.notifyWorkspaceQuotaWarnings}
-                  className="mt-2 h-10 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-slate-100 outline-none focus:border-indigo-500 disabled:opacity-50"
-                />
-                <span className="mt-2 block text-xs text-slate-500">
-                  Example: 90 means you will get an alert when a quota reaches 90% of its limit.
-                </span>
-              </label>
-
-              <hr className="border-slate-800/60 my-2" />
-
-              <ToggleRow
-                label="Quota exceeded alerts"
-                description="Critical alerts shown when a resource limit has been reached and an action was blocked."
-                checked={preferences.notifyWorkspaceQuotaExceeded}
-                onChange={(checked) => updateDraft("notifyWorkspaceQuotaExceeded", checked)}
-              />
             </div>
           </section>
 

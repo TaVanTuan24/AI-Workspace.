@@ -318,9 +318,6 @@ model UserSettings {
   notifyNoUsableModels           Boolean   @default(true) @map("notify_no_usable_models")
   notifyProviderLimitSpikes      Boolean   @default(true) @map("notify_provider_limit_spikes")
   providerLimitSpikeThreshold24h Int       @default(10) @map("provider_limit_spike_threshold_24h")
-  notifyWorkspaceQuotaWarnings   Boolean   @default(true) @map("notify_workspace_quota_warnings")
-  notifyWorkspaceQuotaExceeded   Boolean   @default(true) @map("notify_workspace_quota_exceeded")
-  workspaceQuotaWarningThresholdPercent Int @default(90) @map("workspace_quota_warning_threshold_percent")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

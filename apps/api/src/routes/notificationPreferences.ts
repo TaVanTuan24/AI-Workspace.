@@ -11,10 +11,7 @@ const updateBody = z.object({
   notifyProviderSessionIssues: z.boolean().optional(),
   notifyNoUsableModels: z.boolean().optional(),
   notifyProviderLimitSpikes: z.boolean().optional(),
-  providerLimitSpikeThreshold24h: z.number().int().min(1).max(10_000).optional(),
-  notifyWorkspaceQuotaWarnings: z.boolean().optional(),
-  notifyWorkspaceQuotaExceeded: z.boolean().optional(),
-  workspaceQuotaWarningThresholdPercent: z.number().int().min(50).max(99).optional()
+  providerLimitSpikeThreshold24h: z.number().int().min(1).max(10_000).optional()
 });
 
 export async function notificationPreferenceRoutes(app: FastifyInstance) {
