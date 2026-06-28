@@ -11,6 +11,8 @@ export interface SchedulerSafeSummary {
   warningsCreated?: number;
   exceededCreated?: number;
   skipped?: number;
+  usageDeleted?: number;
+  notificationsDeleted?: number;
   dryRun?: boolean;
   durationMs?: number;
   lock?: "acquired" | "skipped" | "unavailable";
@@ -237,6 +239,8 @@ function sanitizeSummary(input?: SchedulerSafeSummary): SchedulerSafeSummary {
     ...(safeNumber(input?.warningsCreated) !== undefined ? { warningsCreated: safeNumber(input?.warningsCreated) } : {}),
     ...(safeNumber(input?.exceededCreated) !== undefined ? { exceededCreated: safeNumber(input?.exceededCreated) } : {}),
     ...(safeNumber(input?.skipped) !== undefined ? { skipped: safeNumber(input?.skipped) } : {}),
+    ...(safeNumber(input?.usageDeleted) !== undefined ? { usageDeleted: safeNumber(input?.usageDeleted) } : {}),
+    ...(safeNumber(input?.notificationsDeleted) !== undefined ? { notificationsDeleted: safeNumber(input?.notificationsDeleted) } : {}),
     ...(typeof input?.dryRun === "boolean" ? { dryRun: input.dryRun } : {}),
     ...(safeNumber(input?.durationMs) !== undefined ? { durationMs: safeNumber(input?.durationMs) } : {}),
     ...(lock ? { lock } : {}),

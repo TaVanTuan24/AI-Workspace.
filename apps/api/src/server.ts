@@ -20,6 +20,8 @@ import { notificationPreferenceRoutes } from "./routes/notificationPreferences.j
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { providerLiveSubModelsRoutes } from "./routes/providerLiveSubModels.js";
 import { providerHealthScheduler } from "./services/providerHealthScheduler.js";
+import { retentionCleanupScheduler } from "./services/retentionCleanupScheduler.js";
+import { storageRoutes } from "./routes/storage.js";
 import { healthRoutes } from "./routes/health.js";
 import { prisma } from "./services/prisma.js";
 import { closeChatQueue } from "./services/chatQueue.js";
@@ -59,10 +61,12 @@ await app.register(notificationPreferenceRoutes);
 await app.register(onboardingRoutes);
 await app.register(conversationsRoutes);
 await app.register(providerLiveSubModelsRoutes);
+await app.register(storageRoutes);
 
 app.addHook("onClose", async () => {
   await Promise.allSettled([
-    providerHealthScheduler.stop()
+    providerHealthScheduler.stop(),
+    retentionCleanupScheduler.stop()
   ]);
   await Promise.allSettled([
     closeChatQueue(),
@@ -104,6 +108,7 @@ process.once("SIGINT", (signal) => {
 try {
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
   providerHealthScheduler.start();
+  retentionCleanupScheduler.start();
 } catch (error) {
   app.log.error({ err: error }, "API startup failed");
   await app.close().catch(() => {});

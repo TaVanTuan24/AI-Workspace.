@@ -1153,3 +1153,28 @@ export async function importEncryptedConversations(fileData: any, passphrase: st
   return response.json();
 }
 
+// -- Storage stats --
+
+export interface StorageEntry {
+  key: string;
+  label: string;
+  path: string;
+  bytes: number;
+  exists: boolean;
+}
+
+export interface StorageStats {
+  entries: StorageEntry[];
+  totalBytes: number;
+  computedAt: string;
+}
+
+export async function getStorageStats(): Promise<StorageStats> {
+  const response = await fetch(`${API_BASE_URL}/settings/storage`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load storage stats"));
+  return response.json();
+}
+

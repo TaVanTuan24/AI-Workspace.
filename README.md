@@ -354,9 +354,13 @@ curl -f http://localhost:4000/ready
 
 ---
 
-## 18. Backup & restore
+## 18. Backup, storage & cleanup
 
-Local-first snapshots of your state — the SQLite database and the `.data` directory (browser profiles + encrypted session blobs):
+**Storage visibility** — `/settings` shows a Storage card (`GET /settings/storage`) with the on-disk size of the SQLite database (via `PRAGMA`), browser profiles, encrypted session blobs, and local backups.
+
+**Retention cleanup scheduler** — an optional background job (`RETENTION_CLEANUP_SCHEDULER_ENABLED`, off by default; daily interval, Redis-locked) purges expired internal API usage logs (`API_USAGE_RETENTION_DAYS`) and notification events (`NOTIFICATION_EVENT_RETENTION_DAYS`), reusing the same logic as the manual `api-usage:cleanup` / `notification-events:cleanup` scripts. It records runs in the scheduler fleet status. Lower-volume diagnostics/incident cleanups stay manual (`provider-*:cleanup`).
+
+**Backup & restore** — local-first snapshots of your state, the SQLite database and the `.data` directory (browser profiles + encrypted session blobs):
 
 ```bash
 corepack pnpm backup:now                       # → var/backups/uaiw-backup-<timestamp>/

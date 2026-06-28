@@ -10,6 +10,7 @@ import {
   Cable,
   DatabaseBackup,
   Gauge,
+  HardDrive,
   KeyRound,
   RefreshCw,
   SlidersHorizontal,
@@ -20,8 +21,10 @@ import {
   getOnboardingStatus,
   getSettingsOverview,
   getWorkspaceNotifications,
+  getStorageStats,
   type OnboardingStatus,
   type SettingsOverview,
+  type StorageStats,
   type WorkspaceNotification
 } from "../../lib/api";
 import {
@@ -75,6 +78,7 @@ export default function SettingsOverviewPage() {
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [storage, setStorage] = useState<StorageStats | null>(null);
   const [dismissed, setDismissed] = useState<DismissedNotificationMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,15 +91,17 @@ export default function SettingsOverviewPage() {
       try {
         setLoading(true);
         setError("");
-        const [data, notificationData, onboardingData] = await Promise.all([
+        const [data, notificationData, onboardingData, storageData] = await Promise.all([
           getSettingsOverview(),
           getWorkspaceNotifications(),
-          getOnboardingStatus()
+          getOnboardingStatus(),
+          getStorageStats().catch(() => null)
         ]);
         if (!cancelled) {
           setOverview(data);
           setNotifications(notificationData.notifications);
           setOnboarding(onboardingData);
+          setStorage(storageData);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load settings overview");
@@ -290,6 +296,15 @@ export default function SettingsOverviewPage() {
               detail={overview.scheduler.providerHealthEnabled ? "Background provider checks can run" : "Manual refresh only"}
               tone={overview.scheduler.providerHealthEnabled ? "ok" : "warning"}
             />
+            {storage && (
+              <OverviewCard
+                icon={HardDrive}
+                label="Storage"
+                value={formatBytes(storage.totalBytes)}
+                detail={storageDetail(storage)}
+                tone="neutral"
+              />
+            )}
           </section>
 
           <section>
@@ -369,6 +384,20 @@ function OverviewCard({
       <div className="mt-2 text-sm text-slate-500">{detail}</div>
     </article>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 1) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exponent);
+  return `${value.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+}
+
+function storageDetail(storage: StorageStats): string {
+  const present = storage.entries.filter((entry) => entry.exists);
+  if (present.length === 0) return "No local data yet";
+  return present.map((entry) => `${entry.label.split(" ")[0]} ${formatBytes(entry.bytes)}`).join(" · ");
 }
 
 function buildOperationalWarnings(overview: SettingsOverview | null) {
