@@ -225,8 +225,7 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
    * providers with bespoke navigation (e.g. Cloudflare challenges) override this.
    */
   protected async navigate(page: Page): Promise<void> {
-    await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+    await this.gotoWithRetry(page, this.loginUrl);
   }
 
   /**
@@ -236,13 +235,39 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
    */
   protected async navigateForPrompt(page: Page, input: PromptInput): Promise<void> {
     if (input.conversationUrl && this.isConversationUrl(input.conversationUrl)) {
-      await page
-        .goto(input.conversationUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS })
-        .catch(() => {});
-      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+      await this.gotoWithRetry(page, input.conversationUrl);
       return;
     }
     await this.navigate(page);
+  }
+
+  /**
+   * Navigate to `url`, retrying on transient navigation failures (network
+   * blips, navigation timeouts) before giving up. Non-throwing by design: a
+   * persistent failure resolves quietly so the caller surfaces a downstream
+   * "composer not found" / UI-changed signal, exactly as the prior inline
+   * `goto(...).catch(() => {})` did — but now after a bounded retry.
+   */
+  protected async gotoWithRetry(page: Page, url: string, attempts: number = 2): Promise<void> {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
+        await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+        return;
+      } catch {
+        if (attempt >= attempts) return;
+        await page.waitForTimeout(750 * attempt).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * True if a login wall is currently visible. Polled mid-stream so a session
+   * that expires during a response becomes an immediate `requires_login`
+   * signal instead of a silent total-timeout.
+   */
+  protected async detectLoginWall(page: Page): Promise<boolean> {
+    return this.firstVisible(page, this.selectors.loginIndicators ?? [], 250);
   }
 
   /** True when `url` is a resumable provider conversation handle. */

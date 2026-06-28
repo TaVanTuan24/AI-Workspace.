@@ -121,10 +121,24 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
     let lastText = "";
     let lastChangeAt = Date.now();
     let sawAnyResponse = false;
+    let polls = 0;
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < RESPONSE_TOTAL_TIMEOUT_MS) {
       await page.waitForTimeout(RESPONSE_POLL_INTERVAL_MS);
+      polls += 1;
+
+      // Before any reply text appears, watch for a login wall (session expired
+      // mid-request) so we fail fast with an actionable signal, not a timeout.
+      if (!sawAnyResponse && polls % 8 === 0 && (await this.detectLoginWall(page))) {
+        yield {
+          type: "requires_login",
+          provider: this.providerId,
+          jobId: input.jobId,
+          message: "Your ChatGPT session ended during the response. Please reconnect and try again."
+        };
+        return;
+      }
 
       if (await this.detectRateLimit(page)) {
         yield {
