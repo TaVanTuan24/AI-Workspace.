@@ -61,7 +61,10 @@ export async function listThreads(
 
   const rows = await prisma.chatThread.findMany({
     where: { userId },
-    orderBy: { updatedAt: "desc" },
+    // Secondary sort by id keeps pagination deterministic when multiple threads
+    // share the same updatedAt (millisecond ties), so cursor paging never skips
+    // or duplicates a row.
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: limit + 1,
     ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
     select: {

@@ -29,5 +29,13 @@ export const GEMINI_SELECTORS = {
   attachInputCandidates: [
     'input[type="file"][multiple]',
     'input[type="file"]'
+  ],
+  // Sign-in / account-wall cues, used for mid-stream login detection. Mirrors
+  // the surfaces detectLoggedIn already trusts (Google accounts links + the
+  // "Sign in" affordance), kept conservative to avoid false positives.
+  loginIndicators: [
+    'a[href*="accounts.google.com"]',
+    'a:has-text("Sign in")',
+    'button:has-text("Sign in")'
   ]
 } as const;

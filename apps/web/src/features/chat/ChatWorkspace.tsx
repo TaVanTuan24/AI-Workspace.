@@ -102,6 +102,16 @@ export function ChatWorkspace() {
     setDismissedNotifications(readDismissedNotifications());
   }, []);
 
+  // Close any open SSE streams when the chat view unmounts (e.g. navigating
+  // away mid-stream), so connections and listeners are not leaked.
+  useEffect(() => {
+    const sources = sourcesRef.current;
+    return () => {
+      for (const source of sources.values()) source.close();
+      sources.clear();
+    };
+  }, []);
+
   useEffect(() => {
     if (prefsQuery.data) {
       const { models, autoSelectFirstUsable } = prefsQuery.data;
