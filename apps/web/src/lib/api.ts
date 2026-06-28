@@ -52,6 +52,18 @@ export async function connectProvider(provider: ProviderId) {
   return response.json();
 }
 
+// Validates the saved provider session for real (no prompt sent) and returns
+// the refreshed health. ProviderHealth is declared later in this module;
+// interface hoisting makes the forward reference safe.
+export async function testProviderConnection(provider: ProviderId): Promise<ProviderHealth> {
+  const response = await fetch(`${API_BASE_URL}/providers/${provider}/test`, {
+    method: "POST",
+    headers: { "x-local-user-id": "local-user" }
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to test connection"));
+  return response.json();
+}
+
 export async function getLiveSubModels() {
   const response = await fetch(`${API_BASE_URL}/v1/settings/models/live-sub-models`, {
     headers: { "x-local-user-id": "local-user" },

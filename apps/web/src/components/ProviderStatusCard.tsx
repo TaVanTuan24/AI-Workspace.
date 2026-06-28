@@ -2,8 +2,8 @@
 
 import type { ProviderConnectionSummary, ProviderId } from "@uaiw/shared/types/provider";
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleAlert, CircleOff, Loader2, Trash2, Cable, RefreshCw } from "lucide-react";
-import { checkProviderConnectStatus, connectProvider, disconnectProvider } from "../lib/api";
+import { CheckCircle2, CircleAlert, CircleOff, Loader2, Trash2, Cable, RefreshCw, Stethoscope } from "lucide-react";
+import { checkProviderConnectStatus, connectProvider, disconnectProvider, testProviderConnection } from "../lib/api";
 
 const statusCopy: Record<string, string> = {
   not_connected: "Not connected",
@@ -28,8 +28,32 @@ export function ProviderStatusCard({
   const [connectSessionId, setConnectSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [testing, setTesting] = useState(false);
   const connected = provider.status === "connected";
   const pending = provider.status === "connecting" || Boolean(connectSessionId);
+  // A session only exists to validate once the provider is past not_connected.
+  const hasSession = provider.status !== "not_connected" && provider.status !== "disconnected";
+
+  async function testConnection() {
+    if (!canWriteConnections) {
+      setMessage("You don't have permission to perform this action.");
+      return;
+    }
+    setTesting(true);
+    try {
+      const health = await testProviderConnection(provider.provider as ProviderId);
+      setMessage(
+        health.isUsable
+          ? "Session is valid and ready to chat."
+          : health.errorMessage ?? `Session is not usable (status: ${health.connectionStatus}).`
+      );
+      onChanged?.();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to test connection.");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function checkStatus() {
     if (!connectSessionId) return;
@@ -86,6 +110,14 @@ export function ProviderStatusCard({
             }}
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cable className="h-4 w-4" />}
+          </button>
+          <button
+            title="Test connection (validate saved session)"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
+            disabled={!hasSession || pending || testing || !canWriteConnections}
+            onClick={testConnection}
+          >
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Stethoscope className="h-4 w-4" />}
           </button>
           <button
             title="Check login status"

@@ -8,6 +8,7 @@ import { attachLocalUser } from "../middleware/auth.js";
 import { prisma } from "../services/prisma.js";
 import { browserManager } from "../services/browserManager.js";
 import { providerRegistry } from "../services/providerRegistry.js";
+import { refreshProviderHealth } from "../services/providerHealthService.js";
 
 const providerParams = z.object({
   provider: z.enum(PROVIDERS)
@@ -252,15 +253,11 @@ export async function providerRoutes(app: FastifyInstance) {
     if (!(await requirePermission(request, reply, "providerConnections.write"))) return;
     const { provider } = providerParams.parse(request.params);
 
-    // M4: enqueue a lightweight worker validation job instead of testing here.
-    const row = await prisma.providerConnection.findUnique({
-      where: { userId_provider: { userId: request.user.id, provider } }
-    });
-
-    return reply.send({
-      provider,
-      status: row?.status ?? "not_connected"
-    });
+    // Validate the saved session for real: browser-free pre-check when the
+    // cookie jar is definitively expired, otherwise a Chromium validateSession.
+    // This updates the connection status and never sends a prompt.
+    const health = await refreshProviderHealth(request.user.id, provider);
+    return reply.send(health);
   });
 
   app.post("/providers/:provider/disconnect", async (request, reply) => {

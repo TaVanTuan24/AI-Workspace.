@@ -81,6 +81,8 @@ For provider login you need a **visible** browser, so run the worker locally (ou
    (`chatgpt.com`, `claude.ai`, or the Google/Gemini page).
 4. Return to the app and check the connection status.
 
+Each connection card has a **Test connection** action (`POST /providers/:provider/test`) that validates the saved session for real — a browser-free check when the cookie jar is already expired, otherwise a Chromium `validateSession` that never sends a prompt — and refreshes the card's status.
+
 The app never asks for the provider password and never bypasses verification. Use the disconnect action (or `POST /providers/:provider/disconnect`) to delete saved session data.
 
 ---

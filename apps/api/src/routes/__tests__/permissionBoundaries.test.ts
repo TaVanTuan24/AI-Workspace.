@@ -5,6 +5,7 @@ import { modelPreferenceRoutes } from "../modelPreferences.js";
 import { providerHealthRoutes } from "../providerHealth.js";
 import { providerRateLimitRoutes } from "../providerRateLimits.js";
 import { providerRoutes } from "../providers.js";
+import { refreshProviderHealth } from "../../services/providerHealthService.js";
 
 const state = vi.hoisted(() => ({
   role: "member",
@@ -126,6 +127,37 @@ describe("route permission boundaries", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "permission_denied" });
+  });
+
+  it("denies member provider test", async () => {
+    const app = await buildApp(providerRoutes);
+    const response = await app.inject({
+      method: "POST",
+      url: "/providers/gemini/test"
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "permission_denied" });
+  });
+
+  it("validates the saved session on provider test (owner)", async () => {
+    state.role = "owner";
+    const health = {
+      provider: "gemini",
+      connectionStatus: "connected",
+      healthStatus: "healthy",
+      isUsable: true
+    };
+    vi.mocked(refreshProviderHealth).mockResolvedValueOnce(health as any);
+
+    const app = await buildApp(providerRoutes);
+    const response = await app.inject({
+      method: "POST",
+      url: "/providers/gemini/test"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(health);
+    expect(refreshProviderHealth).toHaveBeenCalledWith("permission-test-user", "gemini");
   });
 
   it("denies member provider diagnostics actions", async () => {
