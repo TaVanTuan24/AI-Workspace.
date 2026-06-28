@@ -9,7 +9,7 @@ import { prisma } from "../services/prisma.js";
 import { providerRegistry } from "../services/providerRegistry.js";
 import { RedisJobEventSubscriber } from "../services/redisJobEventBus.js";
 import { publishDone, publishJobEvent } from "../services/redisJobEventPublisher.js";
-import { validateRunnableProvider, createJob, findOwnedJob, parseStoredPayload, enqueueCreatedJob, resolveThreadId, type ProviderItemError } from "../services/chatJobService.js";
+import { validateRunnableProvider, createJob, findOwnedJob, parseStoredPayload, enqueueCreatedJob, resolveThreadId, resolveThreadConversationUrl, type ProviderItemError } from "../services/chatJobService.js";
 import { getModelPreferences } from "../services/modelPreferenceService.js";
 import {
   checkProviderRateLimit,
@@ -123,6 +123,10 @@ provider: providerCheck.provider,
       });
     }
 
+    const conversationUrl = threadId
+      ? await resolveThreadConversationUrl(threadId, providerCheck.provider)
+      : undefined;
+
     const enqueueError = await enqueueCreatedJob({
       jobId: job.id,
       userId: request.user.id,
@@ -130,7 +134,8 @@ provider: providerCheck.provider,
       threadId,
       prompt: body.prompt,
       saveHistory: body.saveHistory,
-      persistUserMessage: false
+      persistUserMessage: false,
+      conversationUrl
     });
     if (enqueueError) {
       return reply.code(503).send(enqueueError);
@@ -254,6 +259,10 @@ provider: providerCheck.provider,
           selectedSubModelLabel: pref?.selectedSubModelLabel
         });
 
+        const conversationUrl = threadId
+          ? await resolveThreadConversationUrl(threadId, provider)
+          : undefined;
+
         const enqueueError = await enqueueCreatedJob({
           jobId: job.id,
           userId: request.user.id,
@@ -261,7 +270,8 @@ provider: providerCheck.provider,
           threadId,
           prompt: body.prompt,
           saveHistory: body.saveHistory,
-          persistUserMessage: false
+          persistUserMessage: false,
+          conversationUrl
         });
 
         if (enqueueError) {
@@ -496,6 +506,10 @@ provider: providerCheck.provider,
       selectedSubModelLabel: pref?.selectedSubModelLabel
     });
 
+    const retryConversationUrl = jobToRetry.threadId
+      ? await resolveThreadConversationUrl(jobToRetry.threadId, providerCheck.provider)
+      : undefined;
+
     const enqueueError = await enqueueCreatedJob({
       jobId: retryJob.id,
       userId: request.user.id,
@@ -505,7 +519,8 @@ provider: providerCheck.provider,
       saveHistory: payload.saveHistory,
       persistUserMessage: false,
       selectedSubModelId: pref?.selectedSubModelId,
-      selectedSubModelLabel: pref?.selectedSubModelLabel
+      selectedSubModelLabel: pref?.selectedSubModelLabel,
+      conversationUrl: retryConversationUrl
     });
     if (enqueueError) return reply.code(503).send(enqueueError);
 

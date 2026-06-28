@@ -115,6 +115,7 @@ export async function enqueueCreatedJob(input: {
   persistUserMessage: boolean;
   selectedSubModelId?: string;
   selectedSubModelLabel?: string;
+  conversationUrl?: string;
 }): Promise<ProviderItemError | null> {
   try {
     await enqueueChatJob(input);
@@ -167,4 +168,26 @@ export async function resolveThreadId(input: {
     }
   });
   return thread.id;
+}
+
+/**
+ * Returns the stored provider-side conversation URL for a thread + provider, so
+ * a follow-up turn resumes the same conversation. Undefined when none is stored.
+ */
+export async function resolveThreadConversationUrl(
+  threadId: string,
+  provider: ProviderId
+): Promise<string | undefined> {
+  const thread = await prisma.chatThread.findUnique({
+    where: { id: threadId },
+    select: { providerConversationsJson: true }
+  });
+  if (!thread?.providerConversationsJson) return undefined;
+  try {
+    const map = JSON.parse(thread.providerConversationsJson) as Record<string, string>;
+    const url = map?.[provider];
+    return typeof url === "string" && url.length > 0 ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }

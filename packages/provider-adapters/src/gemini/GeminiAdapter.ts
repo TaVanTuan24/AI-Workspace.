@@ -15,6 +15,8 @@ export class GeminiAdapter extends BaseProviderAdapter {
   loginUrl = "https://gemini.google.com/app";
   protected readonly selectors: ProviderSelectors = GEMINI_SELECTORS;
   protected readonly providerLabel = "Gemini";
+  // Gemini conversation URLs look like /app/<id>; the bare /app entry point has no id and is not captured.
+  protected readonly conversationUrlPattern = /gemini\.google\.com\/app\/[0-9a-z_-]+/i;
   protected readonly modelPickerCandidates = [
     `button[aria-haspopup="menu"]:has-text("Gemini")`,
     `div[role="button"]:has-text("Advanced")`,
@@ -62,8 +64,7 @@ export class GeminiAdapter extends BaseProviderAdapter {
     input: PromptInput
   ): AsyncIterable<ProviderEvent> {
     const page = await this.firstPage(context);
-    await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+    await this.navigateForPrompt(page, input);
 
     const status = await this.detectLoggedIn(context);
     if (status !== "connected") {
@@ -134,7 +135,8 @@ export class GeminiAdapter extends BaseProviderAdapter {
           type: "message_complete",
           provider: this.providerId,
           jobId: input.jobId,
-          text: lastText
+          text: lastText,
+          conversationUrl: this.captureConversationUrl(page)
         };
         return;
       }
@@ -145,7 +147,8 @@ export class GeminiAdapter extends BaseProviderAdapter {
         type: "message_complete",
         provider: this.providerId,
         jobId: input.jobId,
-        text: lastText
+        text: lastText,
+        conversationUrl: this.captureConversationUrl(page)
       };
       return;
     }

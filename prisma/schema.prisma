@@ -189,6 +189,9 @@ model ChatThread {
   userId    String          @map("user_id")
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
+  // JSON map of { [provider]: conversationUrl } used to continue the same
+  // provider-side conversation across turns. Safe metadata: only provider URLs.
+  providerConversationsJson String? @map("provider_conversations_json")
   messages  Message[]
   jobs      AutomationJob[]
   createdAt DateTime        @default(now()) @map("created_at")

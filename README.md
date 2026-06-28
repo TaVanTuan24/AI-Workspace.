@@ -94,6 +94,15 @@ Chat runs through BullMQ and the worker; the API does not run browser automation
 
 Persistence (when history is enabled): single mode saves one user + one assistant message; compare mode creates one thread, one user message, and one assistant message per provider job.
 
+### Multi-turn continuity
+
+Follow-up messages in the same thread continue the **same provider-side conversation** instead of starting a fresh chat. After each turn the worker captures the provider conversation URL (e.g. `chatgpt.com/c/…`, `claude.ai/chat/…`, `gemini.google.com/app/…`) and stores it on the thread (`ChatThread.providerConversationsJson`, keyed by provider — safe metadata only). The next turn passes the same `threadId`, the API looks up the stored URL, and the adapter navigates back to it.
+
+- Works in single and compare mode (each provider keeps its own conversation per thread) and on retry.
+- The `/chat` UI shows an ongoing transcript and reuses the thread until you click **New** / **New conversation**.
+- If a stored URL is stale or the provider has no stable per-conversation URL, navigation falls back to a fresh chat — continuity degrades gracefully, it never blocks sending.
+- The OpenAI-compatible `/v1` endpoint stays stateless (clients send full history themselves).
+
 ### Job controls
 
 - `GET /chat/:jobId/status` — safe job metadata + DB status (+ optional BullMQ state).

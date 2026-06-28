@@ -80,6 +80,13 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
   protected abstract readonly providerLabel: string;
   /** Candidate buttons that open the model picker, for live sub-model detection. */
   protected readonly modelPickerCandidates: readonly string[] = [];
+  /**
+   * Matches a provider-side conversation URL (e.g. chatgpt.com/c/<id>). Used to
+   * decide whether a captured page URL is a resumable conversation handle and to
+   * validate a stored handle before navigating back to it. Providers without a
+   * stable per-conversation URL leave this undefined (no continuity).
+   */
+  protected readonly conversationUrlPattern?: RegExp;
 
   async startLogin(userId: string): Promise<LoginSession> {
     return {
@@ -220,6 +227,33 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
   protected async navigate(page: Page): Promise<void> {
     await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS }).catch(() => {});
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Navigate before sending a prompt. If a valid stored conversation URL is
+   * supplied (and the provider supports continuity), resume that conversation;
+   * otherwise fall back to the default entry point (a fresh chat).
+   */
+  protected async navigateForPrompt(page: Page, input: PromptInput): Promise<void> {
+    if (input.conversationUrl && this.isConversationUrl(input.conversationUrl)) {
+      await page
+        .goto(input.conversationUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS })
+        .catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+      return;
+    }
+    await this.navigate(page);
+  }
+
+  /** True when `url` is a resumable provider conversation handle. */
+  protected isConversationUrl(url: string): boolean {
+    return Boolean(this.conversationUrlPattern && this.conversationUrlPattern.test(url));
+  }
+
+  /** Returns the current page URL when it is a resumable conversation handle, else undefined. */
+  protected captureConversationUrl(page: Page): string | undefined {
+    const url = page.url();
+    return this.isConversationUrl(url) ? url : undefined;
   }
 
   /** Provider-specific filter for "chrome" (navigation/menu) text vs. a real reply. */

@@ -41,6 +41,17 @@ type ResponseCardState = {
   message?: string;
 };
 
+type Turn = {
+  id: string;
+  prompt: string;
+  cards: Record<string, ResponseCardState>;
+};
+
+function newTurnId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `turn_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+}
+
 export function ChatWorkspace() {
   const providers = useQuery({
     queryKey: ["providers"],
@@ -52,7 +63,8 @@ export function ChatWorkspace() {
   const [selectedCompare, setSelectedCompare] = useState<ProviderId[]>(["gemini", "chatgpt", "claude"]);
   const [prompt, setPrompt] = useState("");
   const [saveHistory, setSaveHistory] = useState(true);
-  const [cards, setCards] = useState<Record<string, ResponseCardState>>({});
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [fallbackNotice, setFallbackNotice] = useState("");
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotificationMap>({});
   
@@ -129,9 +141,33 @@ export function ChatWorkspace() {
     }
     return map;
   }, [visibleNotifications]);
-  const running = Object.values(cards).some(
-    (card) => card.status === "queued" || card.status === "started" || card.status === "streaming"
+  const running = turns.some((turn) =>
+    Object.values(turn.cards).some(
+      (card) => card.status === "queued" || card.status === "started" || card.status === "streaming"
+    )
   );
+
+  function updateTurnCard(
+    turnId: string,
+    provider: ProviderId | string,
+    update: (existing: ResponseCardState) => ResponseCardState
+  ) {
+    setTurns((prev) =>
+      prev.map((turn) =>
+        turn.id === turnId
+          ? {
+              ...turn,
+              cards: {
+                ...turn.cards,
+                [provider]: update(
+                  turn.cards[provider] ?? initialCard(provider as ProviderId, byProvider.get(provider as ProviderId))
+                )
+              }
+            }
+          : turn
+      )
+    );
+  }
   const selectedSingleModel = modelsByProvider.get(selectedSingle);
   const selectedSingleNotification = notificationsByProvider.get(selectedSingle);
   const selectedCompareModels = selectedCompare.map((provider) => modelsByProvider.get(provider)).filter(Boolean);
@@ -149,160 +185,144 @@ export function ChatWorkspace() {
 
   async function submit() {
     if (!prompt.trim() || running || sendBlocked) return;
-    closeAllStreams();
+
+    const turnId = newTurnId();
+    const turnPrompt = prompt.trim();
+    setPrompt("");
 
     if (mode === "single") {
       const definition = byProvider.get(selectedSingle);
-      setCards({
-        [selectedSingle]: initialCard(selectedSingle, definition)
-      });
+      setTurns((prev) => [
+        ...prev,
+        { id: turnId, prompt: turnPrompt, cards: { [selectedSingle]: initialCard(selectedSingle, definition) } }
+      ]);
 
       try {
         const result = await postChat({
           provider: selectedSingle,
-          prompt,
-          saveHistory
+          prompt: turnPrompt,
+          saveHistory,
+          threadId: threadId ?? undefined
         });
-        attachStream(selectedSingle, result.jobId, result.streamUrl);
+        if (result.threadId) setThreadId(result.threadId);
+        attachStream(turnId, selectedSingle, result.jobId, result.streamUrl);
       } catch (error) {
-        setCards({
-          [selectedSingle]: {
-            ...initialCard(selectedSingle, definition),
-            status: errorMessage(error).includes("chat-ready") ? "provider_not_ready" : "requires_login",
-            message: errorMessage(error)
-          }
-        });
+        updateTurnCard(turnId, selectedSingle, () => ({
+          ...initialCard(selectedSingle, definition),
+          status: errorMessage(error).includes("chat-ready") ? "provider_not_ready" : "requires_login",
+          message: errorMessage(error)
+        }));
       }
       return;
     }
 
     const selected: ProviderId[] = selectedCompare.length ? selectedCompare : ["gemini"];
-    setCards(Object.fromEntries(selected.map((provider) => [provider, initialCard(provider, byProvider.get(provider))])));
+    setTurns((prev) => [
+      ...prev,
+      {
+        id: turnId,
+        prompt: turnPrompt,
+        cards: Object.fromEntries(selected.map((provider) => [provider, initialCard(provider, byProvider.get(provider))]))
+      }
+    ]);
 
     try {
       const result = await postMultiChat({
         providers: selected,
-        prompt,
-        saveHistory
+        prompt: turnPrompt,
+        saveHistory,
+        threadId: threadId ?? undefined
       });
+      if (result.threadId) setThreadId(result.threadId);
 
-      setCards((current) => {
-        const next = { ...current };
-        for (const error of result.errors) {
-          const provider = error.provider;
-          next[provider] = {
-            ...initialCard(provider, byProvider.get(provider as ProviderId)),
-            status: error.errorCode === "PROVIDER_NOT_READY" ? "provider_not_ready" : "requires_login",
-            message: error.message
-          };
-        }
-        for (const job of result.jobs) {
-          next[job.provider] = {
-            ...initialCard(job.provider, byProvider.get(job.provider)),
-            jobId: job.jobId,
-            status: "queued"
-          };
-        }
-        return next;
-      });
-
+      for (const error of result.errors) {
+        updateTurnCard(turnId, error.provider, () => ({
+          ...initialCard(error.provider as ProviderId, byProvider.get(error.provider as ProviderId)),
+          status: error.errorCode === "PROVIDER_NOT_READY" ? "provider_not_ready" : "requires_login",
+          message: error.message
+        }));
+      }
       for (const job of result.jobs) {
-        attachStream(job.provider, job.jobId, job.streamUrl);
+        updateTurnCard(turnId, job.provider, () => ({
+          ...initialCard(job.provider, byProvider.get(job.provider)),
+          jobId: job.jobId,
+          status: "queued"
+        }));
+        attachStream(turnId, job.provider, job.jobId, job.streamUrl);
       }
     } catch (error) {
-      setCards({
-        system: {
-          provider: "system",
-          displayName: "System",
-          status: "error",
-          text: "",
-          message: errorMessage(error)
-        }
-      });
+      updateTurnCard(turnId, "system", () => ({
+        provider: "system",
+        displayName: "System",
+        status: "error",
+        text: "",
+        message: errorMessage(error)
+      }));
     }
   }
 
-  function attachStream(provider: ProviderId, jobId: string, path: string) {
+  function startNewConversation() {
+    closeAllStreams();
+    setTurns([]);
+    setThreadId(null);
+  }
+
+  function attachStream(turnId: string, provider: ProviderId, jobId: string, path: string) {
     const source = new EventSource(streamUrl(path));
     sourcesRef.current.set(jobId, source);
 
     const handleEvent = (event: MessageEvent) => {
       const parsed = JSON.parse(event.data) as ProviderEvent;
-      setCards((current) => {
-        const existing = current[provider] ?? initialCard(provider, byProvider.get(provider));
+      updateTurnCard(turnId, provider, (existing) => {
         if (parsed.type === "started") {
-          return { ...current, [provider]: { ...existing, jobId, status: "started" } };
+          return { ...existing, jobId, status: "started" };
         }
         if (parsed.type === "message_delta") {
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "streaming", text: existing.text + parsed.text }
-          };
+          return { ...existing, jobId, status: "streaming", text: existing.text + parsed.text };
         }
         if (parsed.type === "message_complete") {
-          return { ...current, [provider]: { ...existing, jobId, status: "completed", text: parsed.text } };
+          return { ...existing, jobId, status: "completed", text: parsed.text };
         }
         if (parsed.type === "queued") {
-          return { ...current, [provider]: { ...existing, jobId, status: "queued" } };
+          return { ...existing, jobId, status: "queued" };
         }
         if (parsed.type === "requires_login" || parsed.type === "manual_action_required") {
           closeStream(jobId);
           return {
-            ...current,
-            [provider]: {
-              ...existing,
-              jobId,
-              status: parsed.type === "manual_action_required" ? "manual_action_required" : "requires_login",
-              message: parsed.message
-            }
+            ...existing,
+            jobId,
+            status: parsed.type === "manual_action_required" ? "manual_action_required" : "requires_login",
+            message: parsed.message
           };
         }
         if (parsed.type === "cancelled") {
           closeStream(jobId);
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "cancelled", message: parsed.message }
-          };
+          return { ...existing, jobId, status: "cancelled", message: parsed.message };
         }
         if (parsed.type === "rate_limited") {
           closeStream(jobId);
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "rate_limited", message: parsed.message }
-          };
+          return { ...existing, jobId, status: "rate_limited", message: parsed.message };
         }
         if (parsed.type === "timeout") {
           closeStream(jobId);
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "timeout", message: parsed.message }
-          };
+          return { ...existing, jobId, status: "timeout", message: parsed.message };
         }
         if (parsed.type === "retrying") {
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "queued", message: `Retrying ${parsed.retryOfJobId}` }
-          };
+          return { ...existing, jobId, status: "queued", message: `Retrying ${parsed.retryOfJobId}` };
         }
         if (parsed.type === "error") {
           closeStream(jobId);
-          return {
-            ...current,
-            [provider]: { ...existing, jobId, status: "error", message: parsed.message }
-          };
+          return { ...existing, jobId, status: "error", message: parsed.message };
         }
         if (parsed.type === "done") {
           closeStream(jobId);
           return {
-            ...current,
-            [provider]: {
-              ...existing,
-              jobId,
-              status: existing.status === "cancelled" || existing.status === "timeout" ? existing.status : "completed"
-            }
+            ...existing,
+            jobId,
+            status: existing.status === "cancelled" || existing.status === "timeout" ? existing.status : "completed"
           };
         }
-        return current;
+        return existing;
       });
     };
 
@@ -323,19 +343,15 @@ export function ChatWorkspace() {
 
     source.onerror = () => {
       closeStream(jobId);
-      setCards((current) => {
-        const existing = current[provider] ?? initialCard(provider, byProvider.get(provider));
-        return existing.status === "completed"
-          ? current
+      updateTurnCard(turnId, provider, (existing) =>
+        existing.status === "completed"
+          ? existing
           : {
-              ...current,
-              [provider]: {
-                ...existing,
-                status: "error",
-                message: "The stream disconnected before the provider finished responding."
-              }
-            };
-      });
+              ...existing,
+              status: "error",
+              message: "The stream disconnected before the provider finished responding."
+            }
+      );
     };
   }
 
@@ -349,66 +365,43 @@ export function ChatWorkspace() {
     sourcesRef.current.clear();
   }
 
-  async function cancelCardJob(provider: ProviderId | string, jobId: string) {
+  async function cancelCardJob(turnId: string, provider: ProviderId | string, jobId: string) {
     try {
       await cancelChatJob(jobId);
       closeStream(jobId);
-      setCards((current) => ({
-        ...current,
-        [provider]: {
-          ...current[provider],
-          provider,
-          displayName: current[provider]?.displayName ?? provider,
-          status: "cancelled",
-          text: current[provider]?.text ?? "",
-          message: "Job was cancelled."
-        }
+      updateTurnCard(turnId, provider, (existing) => ({
+        ...existing,
+        status: "cancelled",
+        message: "Job was cancelled."
       }));
     } catch (error) {
-      setCards((current) => ({
-        ...current,
-        [provider]: {
-          ...current[provider],
-          provider,
-          displayName: current[provider]?.displayName ?? provider,
-          status: "error",
-          text: current[provider]?.text ?? "",
-          message: errorMessage(error)
-        }
+      updateTurnCard(turnId, provider, (existing) => ({
+        ...existing,
+        status: "error",
+        message: errorMessage(error)
       }));
     }
   }
 
-  async function retryCardJob(provider: ProviderId | string, jobId: string) {
+  async function retryCardJob(turnId: string, provider: ProviderId | string, jobId: string) {
     if (!isProvider(provider)) return;
     try {
       const result = await retryChatJob(jobId);
-      setCards((current) => ({
-        ...current,
-        [provider]: {
-          ...initialCard(provider, byProvider.get(provider)),
-          jobId: result.jobId,
-          status: "queued",
-          message: `Retrying ${jobId}`
-        }
+      updateTurnCard(turnId, provider, () => ({
+        ...initialCard(provider, byProvider.get(provider)),
+        jobId: result.jobId,
+        status: "queued",
+        message: `Retrying ${jobId}`
       }));
-      attachStream(provider, result.jobId, result.streamUrl);
+      attachStream(turnId, provider, result.jobId, result.streamUrl);
     } catch (error) {
-      setCards((current) => ({
-        ...current,
-        [provider]: {
-          ...current[provider],
-          provider,
-          displayName: current[provider]?.displayName ?? provider,
-          status: "error",
-          text: current[provider]?.text ?? "",
-          message: errorMessage(error)
-        }
+      updateTurnCard(turnId, provider, (existing) => ({
+        ...existing,
+        status: "error",
+        message: errorMessage(error)
       }));
     }
   }
-
-  const visibleCards = Object.values(cards);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
@@ -497,9 +490,18 @@ export function ChatWorkspace() {
           />
         ) : null}
 
+        {threadId && turns.length > 0 ? (
+          <div className="mt-4 flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+            <span>Continuing this conversation. Follow-ups stay in the same provider chat.</span>
+            <button type="button" className="font-medium text-accent hover:underline" onClick={startNewConversation}>
+              New
+            </button>
+          </div>
+        ) : null}
+
         <textarea
           className="mt-4 min-h-44 w-full resize-y rounded-md border border-border p-3 text-sm outline-none focus:border-accent"
-          placeholder="Say hello in one short sentence."
+          placeholder={threadId && turns.length > 0 ? "Continue the conversation…" : "Say hello in one short sentence."}
           value={prompt}
           maxLength={20_000}
           onChange={(event) => setPrompt(event.target.value)}
@@ -533,25 +535,45 @@ export function ChatWorkspace() {
             <Square className="h-4 w-4" />
           </button>
           <button
-            title="Clear responses"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface"
+            title="New conversation"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
             type="button"
-            onClick={() => setCards({})}
+            disabled={turns.length === 0 && !threadId}
+            onClick={startNewConversation}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
       </aside>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        {(visibleCards.length ? visibleCards : [initialCard("gemini", byProvider.get("gemini"))]).map((card) => (
-          <StreamingResponseCard
-            key={card.provider}
-            response={card}
-            onCancel={card.jobId ? () => void cancelCardJob(card.provider, card.jobId!) : undefined}
-            onRetry={card.jobId ? () => void retryCardJob(card.provider, card.jobId!) : undefined}
-          />
-        ))}
+      <section className="space-y-6">
+        {turns.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted">
+            Send a prompt to start. Follow-up messages continue the same provider conversation.
+          </div>
+        ) : (
+          turns.map((turn) => {
+            const cards = Object.values(turn.cards);
+            return (
+              <div key={turn.id} className="space-y-3">
+                <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
+                  <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">You</div>
+                  <div className="whitespace-pre-wrap">{turn.prompt}</div>
+                </div>
+                <div className={`grid gap-4 ${cards.length > 1 ? "xl:grid-cols-3" : ""}`}>
+                  {cards.map((card) => (
+                    <StreamingResponseCard
+                      key={card.provider}
+                      response={card}
+                      onCancel={card.jobId ? () => void cancelCardJob(turn.id, card.provider, card.jobId!) : undefined}
+                      onRetry={card.jobId ? () => void retryCardJob(turn.id, card.provider, card.jobId!) : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
       </section>
     </div>
   );

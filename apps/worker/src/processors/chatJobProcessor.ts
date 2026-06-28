@@ -159,17 +159,22 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
         }
       }
 
+      let capturedConversationUrl: string | undefined;
       for await (const event of registered.adapter.sendMessage(context, {
         userId: input.userId,
         jobId: input.jobId,
         threadId: input.threadId ?? undefined,
         prompt: input.prompt,
-        saveHistory: input.saveHistory
+        saveHistory: input.saveHistory,
+        conversationUrl: input.conversationUrl
       })) {
         checkJobTimeout(deadline);
         await throwIfCancelled(input.jobId);
         if (event.type === "message_delta") finalText += event.text;
-        if (event.type === "message_complete") finalText = event.text;
+        if (event.type === "message_complete") {
+          finalText = event.text;
+          if (event.conversationUrl) capturedConversationUrl = event.conversationUrl;
+        }
         if (event.type === "requires_login") {
           await markRequiresLogin(input);
           return;
@@ -202,6 +207,10 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
             metadataJson: JSON.stringify({ jobId: input.jobId })
           }
         });
+      }
+
+      if (input.threadId && capturedConversationUrl) {
+        await persistThreadConversationUrl(input.threadId, input.provider, capturedConversationUrl);
       }
 
       await prisma.providerConnection.update({
@@ -396,6 +405,37 @@ function providerName(provider: ProviderId): string {
 function checkJobTimeout(deadline: number): void {
   if (Date.now() > deadline) {
     throw new Error("JOB_TIMEOUT");
+  }
+}
+
+/**
+ * Persist the provider-side conversation URL onto the thread so the next turn
+ * resumes the same conversation. Stored as a safe { provider: url } JSON map.
+ */
+async function persistThreadConversationUrl(threadId: string, provider: ProviderId, conversationUrl: string): Promise<void> {
+  try {
+    const thread = await prisma.chatThread.findUnique({
+      where: { id: threadId },
+      select: { providerConversationsJson: true }
+    });
+    if (!thread) return;
+    let map: Record<string, string> = {};
+    if (thread.providerConversationsJson) {
+      try {
+        const parsed = JSON.parse(thread.providerConversationsJson);
+        if (parsed && typeof parsed === "object") map = parsed as Record<string, string>;
+      } catch {
+        map = {};
+      }
+    }
+    if (map[provider] === conversationUrl) return;
+    map[provider] = conversationUrl;
+    await prisma.chatThread.update({
+      where: { id: threadId },
+      data: { providerConversationsJson: JSON.stringify(map) }
+    });
+  } catch (err) {
+    console.warn("Failed to persist thread conversation URL", { threadId, provider });
   }
 }
 

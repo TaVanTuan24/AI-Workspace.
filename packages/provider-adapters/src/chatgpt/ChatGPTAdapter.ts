@@ -16,6 +16,7 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
   loginUrl = "https://chatgpt.com";
   protected readonly selectors: ProviderSelectors = CHATGPT_SELECTORS;
   protected readonly providerLabel = "ChatGPT";
+  protected readonly conversationUrlPattern = /chatgpt\.com\/(c|g\/[^/]+\/c)\/[0-9a-f-]+/i;
   protected readonly modelPickerCandidates = [
     `[data-testid="model-switcher"]`,
     `button[aria-haspopup="menu"]:has-text("GPT")`,
@@ -59,8 +60,7 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
     input: PromptInput
   ): AsyncIterable<ProviderEvent> {
     const page = await this.firstPage(context);
-    await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+    await this.navigateForPrompt(page, input);
 
     const status = await this.detectLoggedIn(context);
     if (status !== "connected") {
@@ -163,7 +163,8 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
           type: "message_complete",
           provider: this.providerId,
           jobId: input.jobId,
-          text: lastText
+          text: lastText,
+          conversationUrl: this.captureConversationUrl(page)
         };
         return;
       }
@@ -173,7 +174,8 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
           type: "message_complete",
           provider: this.providerId,
           jobId: input.jobId,
-          text: lastText
+          text: lastText,
+          conversationUrl: this.captureConversationUrl(page)
         };
         return;
       }
@@ -184,7 +186,8 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
         type: "message_complete",
         provider: this.providerId,
         jobId: input.jobId,
-        text: lastText
+        text: lastText,
+        conversationUrl: this.captureConversationUrl(page)
       };
       return;
     }

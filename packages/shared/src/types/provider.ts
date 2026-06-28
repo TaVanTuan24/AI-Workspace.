@@ -105,6 +105,8 @@ export type ProviderEvent =
       provider: ProviderId;
       jobId: string;
       text: string;
+      /** Provider-side conversation URL captured after the turn, for multi-turn continuity. */
+      conversationUrl?: string;
     }
   | {
       type: "requires_login";
@@ -176,6 +178,8 @@ export interface PromptInput {
   threadId?: string;
   prompt: string;
   saveHistory: boolean;
+  /** When set, the adapter continues this provider-side conversation instead of starting a new chat. */
+  conversationUrl?: string;
 }
 
 export interface ProviderSubModel {
@@ -256,6 +260,8 @@ export interface ChatJobPayload {
   persistUserMessage: boolean;
   selectedSubModelId?: string;
   selectedSubModelLabel?: string;
+  /** Provider-side conversation URL to continue, looked up from the thread. */
+  conversationUrl?: string;
 }
 
 export interface ProviderConnectionSummary {

@@ -16,6 +16,7 @@ export class ClaudeAdapter extends BaseProviderAdapter {
   loginUrl = "https://claude.ai";
   protected readonly selectors: ProviderSelectors = CLAUDE_SELECTORS;
   protected readonly providerLabel = "Claude";
+  protected readonly conversationUrlPattern = /claude\.ai\/chat\/[0-9a-f-]+/i;
   protected readonly modelPickerCandidates = [
     `[data-testid="model-selector-dropdown"]`,
     `button[aria-haspopup="menu"]:has-text("Claude")`,
@@ -60,8 +61,7 @@ export class ClaudeAdapter extends BaseProviderAdapter {
     input: PromptInput
   ): AsyncIterable<ProviderEvent> {
     const page = await this.firstPage(context);
-    await page.goto(this.loginUrl, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+    await this.navigateForPrompt(page, input);
 
     const status = await this.detectLoggedIn(context);
     if (status !== "connected") {
@@ -164,7 +164,8 @@ export class ClaudeAdapter extends BaseProviderAdapter {
           type: "message_complete",
           provider: this.providerId,
           jobId: input.jobId,
-          text: lastText
+          text: lastText,
+          conversationUrl: this.captureConversationUrl(page)
         };
         return;
       }
@@ -174,7 +175,8 @@ export class ClaudeAdapter extends BaseProviderAdapter {
           type: "message_complete",
           provider: this.providerId,
           jobId: input.jobId,
-          text: lastText
+          text: lastText,
+          conversationUrl: this.captureConversationUrl(page)
         };
         return;
       }
@@ -185,7 +187,8 @@ export class ClaudeAdapter extends BaseProviderAdapter {
         type: "message_complete",
         provider: this.providerId,
         jobId: input.jobId,
-        text: lastText
+        text: lastText,
+        conversationUrl: this.captureConversationUrl(page)
       };
       return;
     }
