@@ -431,7 +431,14 @@ export function ChatWorkspace() {
     sourcesRef.current.set(jobId, source);
 
     const handleEvent = (event: MessageEvent) => {
-      const parsed = JSON.parse(event.data) as ProviderEvent;
+      let parsed: ProviderEvent;
+      try {
+        parsed = JSON.parse(event.data) as ProviderEvent;
+      } catch {
+        // Ignore frames that are not valid JSON (keep-alives, partial/empty
+        // payloads). A malformed frame must never crash the stream handler.
+        return;
+      }
       updateTurnCard(turnId, provider, (existing) => {
         if (parsed.type === "started") {
           return { ...existing, jobId, status: "started" };
