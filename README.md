@@ -354,7 +354,23 @@ curl -f http://localhost:4000/ready
 
 ---
 
-## 18. Known limitations
+## 18. Backup & restore
+
+Local-first snapshots of your state — the SQLite database and the `.data` directory (browser profiles + encrypted session blobs):
+
+```bash
+corepack pnpm backup:now                       # → var/backups/uaiw-backup-<timestamp>/
+corepack pnpm restore --from var/backups/uaiw-backup-<timestamp> --dry-run
+corepack pnpm restore --from var/backups/uaiw-backup-<timestamp> --force
+```
+
+- A backup folder contains `prisma/dev.db`, `.data/`, and a `backup-metadata.json` (app version, git SHA, timestamp). `var/backups/` is gitignored.
+- Stop the API/worker before restoring so nothing holds the SQLite file open. `restore` refuses to overwrite existing state unless `--force`, and a forced restore first writes a `pre-restore` snapshot so it stays reversible.
+- Backups **exclude** `.env` and `SESSION_MASTER_KEY`. Session blobs are encrypted at rest, so restoring usable provider sessions requires the **same `SESSION_MASTER_KEY`** that was active when the backup was taken — keep it safe separately. Postgres deployments should use `pg_dump` instead of the SQLite snapshot.
+
+---
+
+## 19. Known limitations
 
 - Provider selectors are MVP-grade and break when a provider changes its web UI.
 - Streaming is pseudo-streaming (polling visible text), not token-native.

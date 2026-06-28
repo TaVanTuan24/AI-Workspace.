@@ -35,6 +35,8 @@
     "ci:check": "node tools/ci/check.mjs",
     "ci:smoke:ready": "node tools/ci/smoke-ready.mjs",
     "ci:docker:config": "docker compose config",
+    "backup:now": "node tools/backup/backup.mjs",
+    "restore": "node tools/backup/restore.mjs",
     "provider-health-incidents:cleanup": "node tools/cleanup/provider-health-incidents.mjs",
     "provider-diagnostics:cleanup": "node tools/cleanup/provider-diagnostics.mjs",
     "provider-diagnostics-drift:cleanup": "node tools/cleanup/provider-diagnostics-drift.mjs",
@@ -55,7 +57,7 @@
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm -r typecheck",
     "test:isolation": "node tools/ci/check-test-isolation.mjs",
-    "test": "corepack pnpm -r test && node --test tools/release/*.test.mjs",
+    "test": "corepack pnpm -r test && node --test tools/release/*.test.mjs tools/backup/*.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

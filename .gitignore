@@ -14,6 +14,7 @@ tmp/
 var/smoke-reports/
 var/browser-temp/
 var/session-temp/
+var/backups/
 *.db
 *.db-journal
 
