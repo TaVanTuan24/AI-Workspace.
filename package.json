@@ -38,7 +38,6 @@
     "provider-health-incidents:cleanup": "node tools/cleanup/provider-health-incidents.mjs",
     "provider-diagnostics:cleanup": "node tools/cleanup/provider-diagnostics.mjs",
     "provider-diagnostics-drift:cleanup": "node tools/cleanup/provider-diagnostics-drift.mjs",
-    "provider-recovery-overrides:expire": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/tools/expireProviderRecoveryOverrides.ts",
     "workspace:invites:expire": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/expire-invites.ts",
     "workspace:quota-alerts:run": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/quota-alerts.ts",
     "workspace:quota-events:cleanup": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/cli/quota-events-cleanup.ts",
@@ -65,9 +64,7 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@prisma/client": "^5.16.1",
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "@prisma/client": "^5.16.1"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "^5.0.0",
