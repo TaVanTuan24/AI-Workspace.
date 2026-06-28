@@ -18,21 +18,40 @@ import {
 } from "../services/providerRateLimitService.js";
 import { logProviderRateLimitHit, modelIdForProvider } from "../services/apiUsageService.js";
 import { assertWorkspaceQuota } from "../services/workspaceQuotaService.js";
+import {
+  createAttachment,
+  resolveOwnedAttachmentIds,
+  cloneAttachmentsForJob,
+  deleteAttachments,
+  AttachmentValidationError,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_ATTACHMENT_BYTES
+} from "../services/attachmentService.js";
 
 const MAX_PROMPT_LENGTH = 20_000;
+
+const attachmentIdsField = z.array(z.string()).max(MAX_ATTACHMENTS_PER_MESSAGE).optional();
 
 const chatBody = z.object({
   provider: z.string(),
   threadId: z.string().optional(),
   prompt: z.string().trim().min(1).max(MAX_PROMPT_LENGTH),
-  saveHistory: z.boolean().default(true)
+  saveHistory: z.boolean().default(true),
+  attachmentIds: attachmentIdsField
 });
 
 const multiChatBody = z.object({
   providers: z.array(z.string()).min(1).max(3),
   threadId: z.string().optional(),
   prompt: z.string().trim().min(1).max(MAX_PROMPT_LENGTH),
-  saveHistory: z.boolean().default(true)
+  saveHistory: z.boolean().default(true),
+  attachmentIds: attachmentIdsField
+});
+
+const uploadBody = z.object({
+  filename: z.string().trim().min(1).max(200),
+  mimeType: z.string().trim().min(1).max(200),
+  contentBase64: z.string().min(1)
 });
 
 const redisEvents = new RedisJobEventSubscriber();
@@ -43,6 +62,28 @@ const RETRYABLE_STATUSES = new Set(["failed", "cancelled", "timeout", "requires_
 
 export async function chatRoutes(app: FastifyInstance) {
   app.addHook("preHandler", attachLocalUser);
+
+  // Base64 JSON upload (no multipart dep). Generous body limit so a ~10 MB file
+  // survives base64 inflation; the chat job payload only carries attachment IDs.
+  app.post("/chat/uploads", { bodyLimit: Math.ceil(MAX_ATTACHMENT_BYTES * 1.4) + 1024 }, async (request, reply) => {
+    const body = uploadBody.parse(request.body);
+    try {
+      const attachment = await createAttachment({
+        userId: request.user.id,
+        filename: body.filename,
+        mimeType: body.mimeType,
+        contentBase64: body.contentBase64
+      });
+      return reply.send(attachment);
+    } catch (error) {
+      if (error instanceof AttachmentValidationError) {
+        const status =
+          error.code === "payload_too_large" ? 413 : error.code === "unsupported_media_type" ? 415 : 400;
+        return reply.code(status).send({ errorCode: error.code, message: error.message });
+      }
+      throw error;
+    }
+  });
 
   app.post("/chat", async (request, reply) => {
     const body = chatBody.parse(request.body);
@@ -127,6 +168,13 @@ provider: providerCheck.provider,
       ? await resolveThreadConversationUrl(threadId, providerCheck.provider)
       : undefined;
 
+    const ownedAttachmentIds = body.attachmentIds?.length
+      ? await resolveOwnedAttachmentIds(request.user.id, body.attachmentIds)
+      : [];
+    const jobAttachmentIds = ownedAttachmentIds.length
+      ? await cloneAttachmentsForJob(request.user.id, ownedAttachmentIds)
+      : undefined;
+
     const enqueueError = await enqueueCreatedJob({
       jobId: job.id,
       userId: request.user.id,
@@ -135,8 +183,10 @@ provider: providerCheck.provider,
       prompt: body.prompt,
       saveHistory: body.saveHistory,
       persistUserMessage: false,
-      conversationUrl
+      conversationUrl,
+      attachmentIds: jobAttachmentIds
     });
+    await deleteAttachments(ownedAttachmentIds);
     if (enqueueError) {
       return reply.code(503).send(enqueueError);
     }
@@ -245,6 +295,10 @@ provider: providerCheck.provider,
       });
     }
 
+    const ownedAttachmentIds = body.attachmentIds?.length
+      ? await resolveOwnedAttachmentIds(request.user.id, body.attachmentIds)
+      : [];
+
     const prefs = await getModelPreferences(request.user.id);
     const jobs = await Promise.all(
       runnable.map(async ({ provider }) => {
@@ -263,6 +317,11 @@ provider: providerCheck.provider,
           ? await resolveThreadConversationUrl(threadId, provider)
           : undefined;
 
+        // Each provider gets its own clone so per-job cleanup never races siblings.
+        const jobAttachmentIds = ownedAttachmentIds.length
+          ? await cloneAttachmentsForJob(request.user.id, ownedAttachmentIds)
+          : undefined;
+
         const enqueueError = await enqueueCreatedJob({
           jobId: job.id,
           userId: request.user.id,
@@ -271,7 +330,8 @@ provider: providerCheck.provider,
           prompt: body.prompt,
           saveHistory: body.saveHistory,
           persistUserMessage: false,
-          conversationUrl
+          conversationUrl,
+          attachmentIds: jobAttachmentIds
         });
 
         if (enqueueError) {
@@ -288,6 +348,8 @@ provider: providerCheck.provider,
         };
       })
     );
+
+    await deleteAttachments(ownedAttachmentIds);
 
     const queuedJobs = jobs.filter((item): item is { provider: ProviderId; jobId: string; streamUrl: string } => !("error" in item));
     const enqueueErrors = jobs

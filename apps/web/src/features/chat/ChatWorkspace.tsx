@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, RotateCcw, Send, Square, X } from "lucide-react";
+import { AlertTriangle, Paperclip, RotateCcw, Send, Square, X } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import type { ProviderConnectionSummary, ProviderEvent, ProviderId } from "@uaiw/shared/types/provider";
 import {
@@ -13,7 +13,9 @@ import {
   retryChatJob,
   streamUrl,
   apiGetModelPreferences,
-  getWorkspaceNotifications
+  getWorkspaceNotifications,
+  uploadChatAttachment,
+  type ChatAttachmentView
 } from "../../lib/api";
 import { filterVisibleNotifications, readDismissedNotifications, type DismissedNotificationMap } from "../../lib/notificationDismissals";
 
@@ -44,6 +46,7 @@ type ResponseCardState = {
 type Turn = {
   id: string;
   prompt: string;
+  attachments: ChatAttachmentView[];
   cards: Record<string, ResponseCardState>;
 };
 
@@ -65,6 +68,10 @@ export function ChatWorkspace() {
   const [saveHistory, setSaveHistory] = useState(true);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<ChatAttachmentView[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [fallbackNotice, setFallbackNotice] = useState("");
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotificationMap>({});
   
@@ -188,13 +195,22 @@ export function ChatWorkspace() {
 
     const turnId = newTurnId();
     const turnPrompt = prompt.trim();
+    const turnAttachments = attachments;
+    const attachmentIds = attachments.map((a) => a.id);
     setPrompt("");
+    setAttachments([]);
+    setUploadError("");
 
     if (mode === "single") {
       const definition = byProvider.get(selectedSingle);
       setTurns((prev) => [
         ...prev,
-        { id: turnId, prompt: turnPrompt, cards: { [selectedSingle]: initialCard(selectedSingle, definition) } }
+        {
+          id: turnId,
+          prompt: turnPrompt,
+          attachments: turnAttachments,
+          cards: { [selectedSingle]: initialCard(selectedSingle, definition) }
+        }
       ]);
 
       try {
@@ -202,7 +218,8 @@ export function ChatWorkspace() {
           provider: selectedSingle,
           prompt: turnPrompt,
           saveHistory,
-          threadId: threadId ?? undefined
+          threadId: threadId ?? undefined,
+          attachmentIds: attachmentIds.length ? attachmentIds : undefined
         });
         if (result.threadId) setThreadId(result.threadId);
         attachStream(turnId, selectedSingle, result.jobId, result.streamUrl);
@@ -222,6 +239,7 @@ export function ChatWorkspace() {
       {
         id: turnId,
         prompt: turnPrompt,
+        attachments: turnAttachments,
         cards: Object.fromEntries(selected.map((provider) => [provider, initialCard(provider, byProvider.get(provider))]))
       }
     ]);
@@ -231,7 +249,8 @@ export function ChatWorkspace() {
         providers: selected,
         prompt: turnPrompt,
         saveHistory,
-        threadId: threadId ?? undefined
+        threadId: threadId ?? undefined,
+        attachmentIds: attachmentIds.length ? attachmentIds : undefined
       });
       if (result.threadId) setThreadId(result.threadId);
 
@@ -265,6 +284,33 @@ export function ChatWorkspace() {
     closeAllStreams();
     setTurns([]);
     setThreadId(null);
+    setAttachments([]);
+    setUploadError("");
+  }
+
+  async function handleFilesSelected(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    setUploadError("");
+    setUploading(true);
+    try {
+      for (const file of Array.from(fileList)) {
+        if (attachments.length >= 6) {
+          setUploadError("Up to 6 attachments per message.");
+          break;
+        }
+        const uploaded = await uploadChatAttachment(file);
+        setAttachments((prev) => (prev.length >= 6 ? prev : [...prev, uploaded]));
+      }
+    } catch (error) {
+      setUploadError(errorMessage(error));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
   }
 
   function attachStream(turnId: string, provider: ProviderId, jobId: string, path: string) {
@@ -507,6 +553,40 @@ export function ChatWorkspace() {
           onChange={(event) => setPrompt(event.target.value)}
         />
 
+        {attachments.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {attachments.map((file) => (
+              <span
+                key={file.id}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-xs"
+                title={`${file.filename} · ${(file.sizeBytes / 1024).toFixed(0)} KB`}
+              >
+                <Paperclip className="h-3 w-3 text-muted" />
+                <span className="max-w-[140px] truncate">{file.filename}</span>
+                <button
+                  type="button"
+                  className="text-muted hover:text-foreground"
+                  onClick={() => removeAttachment(file.id)}
+                  aria-label={`Remove ${file.filename}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {uploadError ? <div className="mt-2 text-xs text-red-500">{uploadError}</div> : null}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json,.doc,.docx,.xlsx"
+          onChange={(event) => void handleFilesSelected(event.target.files)}
+        />
+
         <label className="mt-3 flex items-center gap-2 text-sm text-muted">
           <input
             type="checkbox"
@@ -524,6 +604,15 @@ export function ChatWorkspace() {
           >
             <Send className="h-4 w-4" />
             Send
+          </button>
+          <button
+            title="Attach files"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
+            type="button"
+            disabled={uploading || attachments.length >= 6}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4" />
           </button>
           <button
             title="Stop streams"
@@ -559,6 +648,19 @@ export function ChatWorkspace() {
                 <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
                   <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">You</div>
                   <div className="whitespace-pre-wrap">{turn.prompt}</div>
+                  {turn.attachments.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {turn.attachments.map((file) => (
+                        <span
+                          key={file.id}
+                          className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-0.5 text-xs text-muted"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          <span className="max-w-[160px] truncate">{file.filename}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div className={`grid gap-4 ${cards.length > 1 ? "xl:grid-cols-3" : ""}`}>
                   {cards.map((card) => (

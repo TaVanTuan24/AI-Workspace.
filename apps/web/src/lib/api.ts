@@ -122,11 +122,49 @@ export async function sendChat(input: {
   return response.json();
 }
 
+export interface ChatAttachmentView {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export async function uploadChatAttachment(file: File): Promise<ChatAttachmentView> {
+  const buffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  const contentBase64 = btoa(binary);
+
+  const response = await fetch(`${API_BASE_URL}/chat/uploads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-local-user-id": "local-user"
+    },
+    body: JSON.stringify({
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      contentBase64
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message ?? "Failed to upload attachment");
+  }
+  return response.json();
+}
+
 export async function postChat(input: {
   provider: ProviderId;
   prompt: string;
   threadId?: string;
   saveHistory: boolean;
+  attachmentIds?: string[];
 }): Promise<{ jobId: string; threadId: string | null; streamUrl: string }> {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
@@ -150,6 +188,7 @@ export async function postMultiChat(input: {
   prompt: string;
   threadId?: string;
   saveHistory: boolean;
+  attachmentIds?: string[];
 }): Promise<{
   threadId: string | null;
   jobs: Array<{ provider: ProviderId; jobId: string; streamUrl: string }>;

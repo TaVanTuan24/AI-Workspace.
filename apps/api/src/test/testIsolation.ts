@@ -53,6 +53,7 @@ export async function cleanupTestUserData(userId: string): Promise<void> {
   await prisma.providerLiveSubModelCache.deleteMany({ where: { userId } });
 
   // 4. Conversations
+  await prisma.messageAttachment.deleteMany({ where: { userId } });
   await prisma.message.deleteMany({ where: { userId } });
   await prisma.chatThread.deleteMany({ where: { userId } });
 

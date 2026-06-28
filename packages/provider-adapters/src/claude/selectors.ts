@@ -51,5 +51,10 @@ export const CLAUDE_SELECTORS = {
     "text=usage limit",
     "text=Too many requests",
     "text=Try again later"
+  ],
+  attachInputCandidates: [
+    'input[type="file"][multiple]',
+    'input[data-testid="file-upload"]',
+    'input[type="file"]'
   ]
 } as const;

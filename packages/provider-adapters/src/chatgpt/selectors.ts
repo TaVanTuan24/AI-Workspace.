@@ -42,5 +42,9 @@ export const CHATGPT_SELECTORS = {
     "text=rate limit",
     "text=limit",
     "text=Try again later"
+  ],
+  attachInputCandidates: [
+    'input[type="file"][multiple]',
+    'input[type="file"]'
   ]
 } as const;

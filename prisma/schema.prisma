@@ -48,6 +48,7 @@ model User {
   providerSessions                ProviderConnection[]
   threads                         ChatThread[]
   messages                        Message[]
+  messageAttachments              MessageAttachment[]
   automationJobs                  AutomationJob[]
   auditLogs                       AuditLog[]
   internalApiKeys                 InternalApiKey[]
@@ -216,6 +217,24 @@ model Message {
   @@index([threadId, createdAt])
   @@index([userId, createdAt])
   @@map("messages")
+}
+
+// Prompt attachment (image or document). Stored in the DB so the worker can
+// read it across the api/worker process boundary (which do not share a volume).
+// Strict size/type limits apply and rows are deleted once consumed by a job.
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  data      Bytes
+  status    String   @default("pending") // pending | consumed
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, status, createdAt])
+  @@map("message_attachments")
 }
 
 model WorkspaceQuota {

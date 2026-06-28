@@ -40,6 +40,8 @@ export interface ProviderSelectors {
   loginIndicators?: readonly string[];
   manualActionIndicators?: readonly string[];
   rateLimitIndicators?: readonly string[];
+  /** File <input type="file"> candidates used to attach images/documents to a prompt. */
+  attachInputCandidates?: readonly string[];
 }
 
 // Shared timing budget. Identical across all providers; kept here so the
@@ -254,6 +256,29 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
   protected captureConversationUrl(page: Page): string | undefined {
     const url = page.url();
     return this.isConversationUrl(url) ? url : undefined;
+  }
+
+  /**
+   * Attach files to the composer via a hidden <input type="file"> and wait for
+   * the provider to ingest them. Returns true if files were submitted to an input.
+   * Best-effort: returns false (without throwing) when no file input is found so
+   * the caller can surface a UI-changed signal.
+   */
+  protected async attachFiles(page: Page, attachments: PromptInput["attachments"]): Promise<boolean> {
+    if (!attachments || attachments.length === 0) return true;
+    const paths = attachments.map((a) => a.path);
+    const candidates = this.selectors.attachInputCandidates ?? [`input[type="file"]`];
+    for (const selector of candidates) {
+      const input = page.locator(selector).first();
+      const count = await input.count().catch(() => 0);
+      if (count > 0) {
+        await input.setInputFiles(paths, { timeout: 15_000 }).catch(() => {});
+        // Give the provider time to upload and render attachment chips before sending.
+        await page.waitForTimeout(2_500);
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Provider-specific filter for "chrome" (navigation/menu) text vs. a real reply. */

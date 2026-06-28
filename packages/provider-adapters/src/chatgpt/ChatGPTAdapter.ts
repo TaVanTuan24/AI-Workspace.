@@ -97,6 +97,20 @@ export class ChatGPTAdapter extends BaseProviderAdapter {
 
     yield { type: "started", provider: this.providerId, jobId: input.jobId };
 
+    if (input.attachments && input.attachments.length > 0) {
+      const attached = await this.attachFiles(page, input.attachments);
+      if (!attached) {
+        yield {
+          type: "error",
+          provider: this.providerId,
+          jobId: input.jobId,
+          errorCode: "PROVIDER_UI_CHANGED",
+          message: "ChatGPT file attachment input was not found. The provider UI may have changed."
+        };
+        return;
+      }
+    }
+
     await this.fillComposer(page, composer, input.prompt);
     const beforeResponseText = await this.latestResponseText(page);
     const sent = await this.clickSend(page);

@@ -103,6 +103,14 @@ Follow-up messages in the same thread continue the **same provider-side conversa
 - If a stored URL is stale or the provider has no stable per-conversation URL, navigation falls back to a fresh chat — continuity degrades gracefully, it never blocks sending.
 - The OpenAI-compatible `/v1` endpoint stays stateless (clients send full history themselves).
 
+### Attachments
+
+Prompts can include image/document attachments (PNG/JPG/WebP/GIF, PDF, txt/md/csv/json, doc/docx/xlsx), up to 6 files and ~10 MB each.
+
+- The composer uploads each file to `POST /chat/uploads` (base64 JSON, no multipart dependency); the file is stored in the DB (`MessageAttachment`) so the worker can read it across the api/worker process boundary (which do not share a volume).
+- The chat request carries only `attachmentIds`. Each job (including each provider in compare mode) gets its own clone so per-job cleanup never races siblings; the worker writes the bytes to a temp file, attaches them via the provider's file input, then deletes the temp files and the attachment rows.
+- MIME type and size are validated on upload; the chat job payload never carries file bytes.
+
 ### Job controls
 
 - `GET /chat/:jobId/status` — safe job metadata + DB status (+ optional BullMQ state).
@@ -349,7 +357,7 @@ curl -f http://localhost:4000/ready
 
 - Provider selectors are MVP-grade and break when a provider changes its web UI.
 - Streaming is pseudo-streaming (polling visible text), not token-native.
-- No file upload, vision, voice, tools, or function calling.
+- File/image attachments are supported in the `/chat` UI; voice, tools, and function calling are not. The OpenAI-compatible `/v1` endpoint does not accept attachments.
 - No exact token-usage accounting.
 - A valid, connected browser session is required for any chat.
 - CAPTCHA, 2FA, passkeys, account challenges, anti-bot controls, and rate limits are never bypassed — they require manual user action.

@@ -116,6 +116,7 @@ export async function enqueueCreatedJob(input: {
   selectedSubModelId?: string;
   selectedSubModelLabel?: string;
   conversationUrl?: string;
+  attachmentIds?: string[];
 }): Promise<ProviderItemError | null> {
   try {
     await enqueueChatJob(input);

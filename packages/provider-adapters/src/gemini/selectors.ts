@@ -25,5 +25,9 @@ export const GEMINI_SELECTORS = {
     'button[aria-label*="Stop" i]',
     'button[aria-label*="Cancel" i]',
     'button:has(mat-icon:has-text("stop"))'
+  ],
+  attachInputCandidates: [
+    'input[type="file"][multiple]',
+    'input[type="file"]'
   ]
 } as const;

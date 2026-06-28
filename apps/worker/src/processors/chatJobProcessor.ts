@@ -1,6 +1,9 @@
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Job } from "bullmq";
 import { PrismaClient } from "@prisma/client";
-import type { ChatJobPayload, ErrorCode, ProviderEvent, ProviderId } from "@uaiw/shared/types/provider.js";
+import type { ChatJobPayload, ErrorCode, ProviderEvent, ProviderId, PromptAttachment } from "@uaiw/shared/types/provider.js";
 import { AesGcmSessionVault, type EncryptedSession } from "@uaiw/session-vault/index.js";
 import { BrowserManager } from "../browser/BrowserManager.js";
 import { providerRegistry } from "../providers/registry.js";
@@ -48,6 +51,7 @@ export async function chatJobProcessor(job: Job<ChatJobPayload>) {
 
 async function processChatJob(input: ChatJobPayload): Promise<void> {
   let finalText = "";
+  let attachmentDir: string | undefined;
   const deadline = Date.now() + env.CHAT_JOB_TIMEOUT_MS;
 
   try {
@@ -159,6 +163,13 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
         }
       }
 
+      let attachments: PromptAttachment[] | undefined;
+      if (input.attachmentIds && input.attachmentIds.length > 0) {
+        const materialized = await materializeAttachments(input.userId, input.attachmentIds);
+        attachmentDir = materialized.dir;
+        attachments = materialized.attachments;
+      }
+
       let capturedConversationUrl: string | undefined;
       for await (const event of registered.adapter.sendMessage(context, {
         userId: input.userId,
@@ -166,6 +177,7 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
         threadId: input.threadId ?? undefined,
         prompt: input.prompt,
         saveHistory: input.saveHistory,
+        attachments,
         conversationUrl: input.conversationUrl
       })) {
         checkJobTimeout(deadline);
@@ -235,6 +247,9 @@ async function processChatJob(input: ChatJobPayload): Promise<void> {
           .catch((err) => console.warn("stopGeneration failed during cleanup", { jobId: input.jobId, err }));
       }
       await browserManager.closeContext(context);
+      if (input.attachmentIds && input.attachmentIds.length > 0) {
+        await consumeAttachments(input.attachmentIds, attachmentDir);
+      }
     }
   } catch (error) {
     if (error instanceof Error && error.message === "JOB_CANCELLED") {
@@ -406,6 +421,47 @@ function checkJobTimeout(deadline: number): void {
   if (Date.now() > deadline) {
     throw new Error("JOB_TIMEOUT");
   }
+}
+
+/** Sanitize a stored filename for safe use on disk (no path separators). */
+function safeFilename(name: string): string {
+  const base = name.replace(/[/\\]/g, "_").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-128);
+  return base.length > 0 ? base : "attachment";
+}
+
+/**
+ * Read stored attachment rows for this user and write them to a per-job temp
+ * directory so the adapter can feed them to the provider via setInputFiles.
+ */
+async function materializeAttachments(
+  userId: string,
+  attachmentIds: string[]
+): Promise<{ dir: string; attachments: PromptAttachment[] }> {
+  const dir = await mkdtemp(join(tmpdir(), "uaiw-attachments-"));
+  const rows = await prisma.messageAttachment.findMany({
+    where: { id: { in: attachmentIds }, userId }
+  });
+  // Preserve the caller's order.
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const attachments: PromptAttachment[] = [];
+  for (const id of attachmentIds) {
+    const row = byId.get(id);
+    if (!row) continue;
+    const path = join(dir, `${row.id}-${safeFilename(row.filename)}`);
+    await writeFile(path, Buffer.from(row.data));
+    attachments.push({ path, filename: row.filename, mimeType: row.mimeType });
+  }
+  return { dir, attachments };
+}
+
+/** Remove temp files and delete the one-shot attachment rows after a job consumes them. */
+async function consumeAttachments(attachmentIds: string[], dir: string | undefined): Promise<void> {
+  if (dir) {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+  await prisma.messageAttachment
+    .deleteMany({ where: { id: { in: attachmentIds } } })
+    .catch((err) => console.warn("Failed to delete consumed attachments", { count: attachmentIds.length }));
 }
 
 /**

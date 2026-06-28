@@ -180,6 +180,14 @@ export interface PromptInput {
   saveHistory: boolean;
   /** When set, the adapter continues this provider-side conversation instead of starting a new chat. */
   conversationUrl?: string;
+  /** Local file paths (written by the worker from stored attachments) to attach to the prompt. */
+  attachments?: PromptAttachment[];
+}
+
+export interface PromptAttachment {
+  path: string;
+  filename: string;
+  mimeType: string;
 }
 
 export interface ProviderSubModel {
@@ -262,6 +270,8 @@ export interface ChatJobPayload {
   selectedSubModelLabel?: string;
   /** Provider-side conversation URL to continue, looked up from the thread. */
   conversationUrl?: string;
+  /** IDs of stored MessageAttachment rows to attach; the worker resolves bytes from the DB. */
+  attachmentIds?: string[];
 }
 
 export interface ProviderConnectionSummary {
