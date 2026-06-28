@@ -179,6 +179,8 @@ provider: providerCheck.provider,
     });
     await deleteAttachments(ownedAttachmentIds);
     if (enqueueError) {
+      // Job never enqueued → its cloned attachments would never be consumed.
+      if (jobAttachmentIds?.length) await deleteAttachments(jobAttachmentIds);
       return reply.code(503).send(enqueueError);
     }
 
@@ -315,6 +317,9 @@ provider: providerCheck.provider,
         });
 
         if (enqueueError) {
+          // The job never reached the worker, so its cloned attachments would
+          // otherwise never be consumed/deleted — clean them up now.
+          if (jobAttachmentIds?.length) await deleteAttachments(jobAttachmentIds);
           return {
             provider,
             error: enqueueError
@@ -374,7 +379,9 @@ provider: providerCheck.provider,
     } as unknown as OutgoingHttpHeaders;
     reply.raw.writeHead(200, sseHeaders);
 
+    let finished = false;
     const send = (event: string, data: unknown) => {
+      if (finished) return;
       reply.raw.write(`event: ${event}\n`);
       reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
     };
@@ -384,29 +391,40 @@ provider: providerCheck.provider,
     }, 5000);
 
     let unsubscribe: (() => Promise<void>) | undefined;
-    unsubscribe = await redisEvents.subscribe(jobId, (event) => {
-      send(event.type, event);
-      if (
-        event.type === "done" ||
-        event.type === "error" ||
-        event.type === "requires_login" ||
-        event.type === "manual_action_required" ||
-        event.type === "rate_limited" ||
-        event.type === "cancelled" ||
-        event.type === "timeout"
-      ) {
-        clearInterval(pingInterval);
-        void unsubscribe?.();
-        reply.raw.end();
-      }
-    });
-
-    request.raw.on("close", () => {
+    // Idempotent teardown: safe to call whether or not `unsubscribe` has been
+    // assigned yet. Critical because subscribe() replays buffered events
+    // synchronously before it returns the handle — a terminal replayed event
+    // (attaching to an already-finished job) must not leave the Redis
+    // subscriber connection dangling.
+    const teardown = () => {
+      if (finished) return;
+      finished = true;
       clearInterval(pingInterval);
       void unsubscribe?.();
-    });
+      reply.raw.end();
+    };
+
+    const TERMINAL = new Set(["done", "error", "requires_login", "manual_action_required", "rate_limited", "cancelled", "timeout"]);
 
     send("connected", { jobId });
+
+    unsubscribe = await redisEvents.subscribe(jobId, (event) => {
+      if (finished) return;
+      send(event.type, event);
+      if (TERMINAL.has(event.type)) teardown();
+    });
+
+    // If a replayed terminal event finished the stream during subscribe(),
+    // `unsubscribe` was undefined inside teardown — release it now.
+    if (finished) {
+      void unsubscribe?.();
+    } else {
+      request.raw.on("close", () => {
+        finished = true;
+        clearInterval(pingInterval);
+        void unsubscribe?.();
+      });
+    }
   });
 
   app.get("/chat/:jobId/status", async (request, reply) => {
