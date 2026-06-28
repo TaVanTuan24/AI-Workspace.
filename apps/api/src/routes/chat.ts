@@ -51,7 +51,9 @@ const multiChatBody = z.object({
 const uploadBody = z.object({
   filename: z.string().trim().min(1).max(200),
   mimeType: z.string().trim().min(1).max(200),
-  contentBase64: z.string().min(1)
+  // Allow empty here so the service returns a clean 400 ("Attachment is empty")
+  // instead of a raw Zod 500.
+  contentBase64: z.string()
 });
 
 const redisEvents = new RedisJobEventSubscriber();
