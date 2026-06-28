@@ -54,8 +54,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 # Paste the value into SESSION_MASTER_KEY (must decode to exactly 32 bytes)
 
 corepack pnpm exec prisma generate
-corepack pnpm exec prisma migrate dev --name init
+corepack pnpm exec prisma migrate deploy
 ```
+
+> The migration history is a single squashed `0_init` baseline. Fresh setups apply it as above. **Existing databases** created before the squash must baseline once instead: `corepack pnpm exec prisma migrate resolve --applied 0_init` (then `migrate deploy` for any later migrations). See `docs/UPGRADE-0.3.0.md`.
 
 Run services (Redis must be up first):
 

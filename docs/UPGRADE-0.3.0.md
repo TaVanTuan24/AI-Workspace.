@@ -8,7 +8,15 @@ Before starting the upgrade, create a full backup of your `var/` directory (or w
 
 ## 2. Apply Prisma Migrations
 
-Several new database tables were introduced for Workspace Quotas, Admin Observability, and Notification Retries. Apply these schema changes first:
+> **Migration history was squashed to a single `0_init` baseline.** The previous history could not replay on a fresh shadow database (some tables were created via `db push` and never had a creating migration), which blocked `prisma migrate dev`. It is now one self-consistent baseline reflecting the current schema.
+>
+> **Existing database created before the squash — run this once, first:**
+> ```bash
+> pnpm prisma migrate resolve --applied 0_init
+> ```
+> It records the baseline as already-applied without touching your data. Skipping it makes `migrate deploy` fail with P3005 ("schema is not empty"). Fresh databases skip this step.
+
+After baselining (or on a fresh database), apply migrations:
 
 ```bash
 pnpm prisma migrate deploy
