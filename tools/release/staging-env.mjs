@@ -11,7 +11,6 @@ const REQUIRED_GENERATED_KEYS = new Set([
   "APP_SECRET",
   "SESSION_MASTER_KEY",
   "API_KEY_HASH_SECRET",
-  "NOTIFICATION_SECRET_ENCRYPTION_KEY",
   "INTERNAL_API_KEY"
 ]);
 const PROVIDER_CREDENTIAL_KEY_PARTS = [
@@ -163,7 +162,7 @@ function shouldGenerateSecret(key, value) {
 }
 
 function generateValueForKey(key, randomBytes = crypto.randomBytes) {
-  if (key === "SESSION_MASTER_KEY" || key === "NOTIFICATION_SECRET_ENCRYPTION_KEY") {
+  if (key === "SESSION_MASTER_KEY") {
     return randomBytes(32).toString("base64");
   }
   return randomBytes(32).toString("base64url");
@@ -217,9 +216,6 @@ export async function validateGeneratedEnv({ outPath, content, values, gitignore
   }
   if (Buffer.from(values.SESSION_MASTER_KEY || "", "base64").length !== 32) {
     errors.push("SESSION_MASTER_KEY must be base64 and decode to 32 bytes.");
-  }
-  if (Buffer.from(values.NOTIFICATION_SECRET_ENCRYPTION_KEY || "", "base64").length !== 32) {
-    errors.push("NOTIFICATION_SECRET_ENCRYPTION_KEY must be base64 and decode to 32 bytes.");
   }
   if ((values.INTERNAL_API_KEY || "").length < 24) {
     errors.push("INTERNAL_API_KEY must be at least 24 characters.");

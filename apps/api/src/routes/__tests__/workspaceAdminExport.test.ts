@@ -38,7 +38,6 @@ const mockExport = {
     notifications: { unread: 0, criticalRecent: 0 },
     providers: { usable: 0, requiresAttention: 0 },
     emailDelivery: { enabled: false, provider: "noop", dryRun: true, realSendPossible: false },
-    webhooks: { destinations: 0, deadLetters: 0 },
     diagnostics: { openDriftAlerts: 0 },
   },
   schedulerFleetStatus: { schedulers: [] },

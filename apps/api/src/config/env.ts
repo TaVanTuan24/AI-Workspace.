@@ -55,14 +55,7 @@ const envSchema = z.object({
   WORKSPACE_INVITE_SMTP_SECURE: z.coerce.boolean().default(false),
   WORKSPACE_INVITE_SMTP_USER: z.string().optional(),
   WORKSPACE_INVITE_SMTP_PASSWORD: z.string().optional(),
-  WORKSPACE_INVITE_BASE_URL: z.string().optional(),
-  NOTIFICATION_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
-  NOTIFICATION_WEBHOOK_ALLOW_LOCALHOST: z.coerce.boolean().default(false),
-  NOTIFICATION_SECRET_ENCRYPTION_KEY: z.string().optional(),
-  NOTIFICATION_WEBHOOK_RETRY_ENABLED: z.coerce.boolean().default(true),
-  NOTIFICATION_WEBHOOK_RETRY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
-  NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS: z.coerce.number().int().positive().default(30000),
-  NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(900000)
+  WORKSPACE_INVITE_BASE_URL: z.string().optional()
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;
@@ -138,10 +131,6 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
 
   validateSessionMasterKey(raw.SESSION_MASTER_KEY, isProduction, shouldWarn, errors, warn);
 
-  if (parsed.NOTIFICATION_SECRET_ENCRYPTION_KEY) {
-    validateSecret("NOTIFICATION_SECRET_ENCRYPTION_KEY", parsed.NOTIFICATION_SECRET_ENCRYPTION_KEY, isProduction, shouldWarn, errors, warn, 32);
-  }
-
   if (parsed.WORKSPACE_INVITE_EMAIL_DELIVERY_ENABLED) {
     if (parsed.WORKSPACE_INVITE_EMAIL_PROVIDER === "smtp") {
       if (!parsed.WORKSPACE_INVITE_SMTP_HOST) {
@@ -158,10 +147,6 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Ap
 
   if (parsed.NODE_ENV === "test" && parsed.WORKSPACE_INVITE_EMAIL_ALLOW_REAL_SEND) {
     errors.push("Real email send cannot be enabled in test environment.");
-  }
-
-  if (parsed.NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS < parsed.NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS) {
-    errors.push("NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS must be greater than or equal to NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS.");
   }
 
   if (parsed.ENABLE_DB_API_KEYS) {

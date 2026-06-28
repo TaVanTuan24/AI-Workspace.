@@ -6,7 +6,6 @@ import type { ChatJobPayload, ProviderId } from "@uaiw/shared/types/provider.js"
 import { env } from "./config/env.js";
 import { workerRedis } from "./services/chatQueue.js";
 import { chatJobProcessor, shutdownChatJobProcessor } from "./processors/chatJobProcessor.js";
-import { notificationWebhookRetryProcessor, shutdownNotificationWebhookRetryProcessor } from "./processors/notificationWebhookRetryProcessor.js";
 import { RedisJobEventPublisher } from "./services/redisJobEventPublisher.js";
 
 const prisma = new PrismaClient();
@@ -14,8 +13,6 @@ const publisher = new RedisJobEventPublisher(workerRedis);
 
 let worker: Worker<ChatJobPayload> | undefined;
 let queueEvents: QueueEvents | undefined;
-let webhookRetryWorker: Worker<any> | undefined;
-let webhookRetryQueueEvents: QueueEvents | undefined;
 let isShuttingDown = false;
 
 async function main(): Promise<void> {
@@ -31,23 +28,11 @@ async function main(): Promise<void> {
     connection: workerRedis
   });
 
-  webhookRetryWorker = new Worker("notification-webhook-retry", notificationWebhookRetryProcessor, {
-    connection: workerRedis,
-    concurrency: 2
-  });
-
-  webhookRetryQueueEvents = new QueueEvents("notification-webhook-retry", {
-    connection: workerRedis
-  });
-
   wireWorkerEvents(worker, queueEvents);
-  wireWebhookRetryEvents(webhookRetryWorker, webhookRetryQueueEvents);
 
   await Promise.all([
     worker.waitUntilReady(),
-    queueEvents.waitUntilReady(),
-    webhookRetryWorker.waitUntilReady(),
-    webhookRetryQueueEvents.waitUntilReady()
+    queueEvents.waitUntilReady()
   ]);
 
   console.info("Unified AI Workspace worker started", {
@@ -86,23 +71,6 @@ function wireWorkerEvents(chatWorker: Worker<ChatJobPayload>, events: QueueEvent
   });
 }
 
-function wireWebhookRetryEvents(retryWorker: Worker<any>, events: QueueEvents): void {
-  retryWorker.on("failed", (job, err) => {
-    console.error("webhook retry job failed internally", {
-      jobId: job?.id,
-      message: err.message
-    });
-  });
-
-  retryWorker.on("completed", (job) => {
-    console.info("webhook retry job completed", { jobId: job.id });
-  });
-
-  events.on("stalled", ({ jobId }) => {
-    console.error("webhook retry job stalled", { jobId });
-  });
-}
-
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
@@ -117,10 +85,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       Promise.allSettled([
         worker?.close(),
         queueEvents?.close(),
-        webhookRetryWorker?.close(),
-        webhookRetryQueueEvents?.close(),
         shutdownChatJobProcessor(),
-        shutdownNotificationWebhookRetryProcessor(),
         prisma.$disconnect(),
         workerRedis.quit().catch(() => {
           workerRedis.disconnect();

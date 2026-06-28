@@ -209,32 +209,4 @@ export interface NotificationEventView {
     createdAt: string;
     fingerprint: string;
 }
-export type NotificationDeliveryChannel = "in_app" | "email_noop" | "slack_noop" | "webhook_noop" | "webhook";
-export type NotificationDeliveryStatus = "delivered" | "skipped_disabled" | "skipped_not_configured" | "failed";
-export interface WebhookDeliveryConfigView {
-    enabled: boolean;
-    configured: boolean;
-    urlPreview?: string | null;
-    hasSigningSecret: boolean;
-    lastRotatedAt?: string | null;
-}
-export interface NotificationDeliveryPreferenceView {
-    channel: NotificationDeliveryChannel;
-    enabled: boolean;
-    configured: boolean;
-    label: string;
-    description: string;
-    config?: WebhookDeliveryConfigView;
-}
-export interface NotificationDeliveryAttemptView {
-    id: string;
-    notificationEventId: string;
-    channel: NotificationDeliveryChannel;
-    status: NotificationDeliveryStatus;
-    errorCode?: string | null;
-    attemptedAt: string;
-    attemptNumber: number;
-    retryable: boolean;
-    nextRetryAt?: string | null;
-}
 export declare function isProviderId(value: string): value is ProviderId;

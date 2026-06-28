@@ -30,7 +30,6 @@ describe("staging-verify", () => {
       if (req.url === "/settings/overview") return json(res, 200, { providers: [] });
       if (req.url === "/settings/provider-health/incidents?limit=10") return json(res, 200, { data: [] });
       if (req.url === "/settings/provider-health/diagnostics-runs?limit=10") return json(res, 200, { data: [] });
-      if (req.url === "/settings/notification-delivery/dead-letters?limit=10") return json(res, 200, { deadLetters: [] });
       if (req.url === "/settings/workspace/admin-overview") return json(res, 200, { overview: {} });
       if (req.url === "/settings/workspace/activity") return json(res, 200, { data: [] });
       if (req.url === "/settings/workspace/schedulers") return json(res, 200, { schedulers: [] });

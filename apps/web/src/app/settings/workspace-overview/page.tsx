@@ -123,10 +123,6 @@ export default function WorkspaceOverviewPage() {
           <Stat label="Real Send" value={overview.emailDelivery.realSendPossible ? "Ready" : "Blocked"} variant={overview.emailDelivery.realSendPossible ? "success" : "default"} />
         </StatCard>
 
-        <StatCard title="Webhooks" href="/settings/notifications">
-          <Stat label="Destinations" value={overview.webhooks.destinations} />
-          <Stat label="Dead Letters" value={overview.webhooks.deadLetters} variant={overview.webhooks.deadLetters > 0 ? "error" : "default"} />
-        </StatCard>
 
         <StatCard title="Diagnostics" href="/settings/provider-health">
           <Stat label="Open Drift Alerts" value={overview.diagnostics.openDriftAlerts} variant={overview.diagnostics.openDriftAlerts > 0 ? "warning" : "success"} />

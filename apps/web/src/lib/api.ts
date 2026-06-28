@@ -1,6 +1,6 @@
-import type { ProviderConnectionSummary, ProviderId, WorkspaceNotification, NotificationEventView, NotificationDeliveryPreferenceView, NotificationDeliveryAttemptView } from "@uaiw/shared/types/provider";
+import type { ProviderConnectionSummary, ProviderId, WorkspaceNotification, NotificationEventView } from "@uaiw/shared/types/provider";
 
-export type { WorkspaceNotification, NotificationEventView, NotificationDeliveryPreferenceView, NotificationDeliveryAttemptView };
+export type { WorkspaceNotification, NotificationEventView };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -13,8 +13,6 @@ export type WorkspacePermission =
   | "providerConnections.write"
   | "providerDiagnostics.read"
   | "providerDiagnostics.action"
-  | "webhooks.read"
-  | "webhooks.write"
   | "notifications.read"
   | "notifications.write"
   | "usage.read"
@@ -834,93 +832,6 @@ export async function markAllNotificationEventsRead(): Promise<{ updated: number
   return response.json();
 }
 
-export async function getNotificationDeliveryPreferences(): Promise<{ preferences: NotificationDeliveryPreferenceView[] }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/preferences`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to fetch delivery preferences");
-  return response.json();
-}
-
-export async function updateNotificationDeliveryPreference(channel: string, enabled: boolean): Promise<NotificationDeliveryPreferenceView> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/preferences/${channel}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify({ enabled })
-  });
-  if (!response.ok) throw new Error("Failed to update delivery preference");
-  return response.json();
-}
-
-export async function getNotificationDeliveryAttempts(params?: { limit?: number; notificationEventId?: string }): Promise<{ attempts: NotificationDeliveryAttemptView[] }> {
-  const search = new URLSearchParams();
-  if (params?.limit) search.set("limit", String(params.limit));
-  if (params?.notificationEventId) search.set("notificationEventId", params.notificationEventId);
-
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/attempts?${search}`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to fetch delivery attempts");
-  return response.json();
-}
-
-export async function getWebhookDeliveryConfig(): Promise<NotificationDeliveryPreferenceView> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to fetch webhook config");
-  return response.json();
-}
-
-export async function updateWebhookDeliveryConfig(input: { enabled: boolean; url: string }): Promise<{ preference: NotificationDeliveryPreferenceView; newSecret: string | null }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(input)
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to update webhook config");
-  }
-  return response.json();
-}
-
-export async function rotateWebhookSigningSecret(): Promise<{ preference: NotificationDeliveryPreferenceView; signingSecret: string }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook/rotate-secret`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) throw new Error("Failed to rotate webhook secret");
-  return response.json();
-}
-
-export async function testWebhookDelivery(): Promise<{ attempts: NotificationDeliveryAttemptView[] }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook/test`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to test webhook");
-  }
-  return response.json();
-}
-
-export async function retryNotificationDeliveryAttempt(id: string): Promise<{ queued: true; jobId: string; notificationEventId: string }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/attempts/${id}/retry`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to retry delivery attempt");
-  }
-  return response.json();
-}
-
 // -- Provider Rate Limits --
 
 export interface ProviderRateLimitView {
@@ -1466,208 +1377,11 @@ export async function importEncryptedConversations(fileData: any, passphrase: st
   return response.json();
 }
 
-export interface NotificationDeadLetterView {
-  id: string;
-  notificationEventId: string;
-  deliveryAttemptId?: string;
-  kind: string;
-  channel: string;
-  status: "open" | "resolved";
-  reason: string;
-  failureCode?: string;
-  retryable: boolean;
-  retryCount: number;
-  firstFailedAt: string;
-  deadLetteredAt: string;
-  lastRetryAt?: string;
-  resolvedAt?: string;
-  eventTitle?: string;
-  eventSeverity?: string;
-}
-
-export async function getDeadLetters(params?: { status?: string; limit?: number }) {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.limit) q.set("limit", params.limit.toString());
-  const res = await fetch(`/api/v1/settings/notification-delivery/dead-letters?${q.toString()}`);
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to fetch dead letters" }));
-    throw new Error(error.error || "Failed to fetch dead letters");
-  }
-  return res.json() as Promise<{ deadLetters: NotificationDeadLetterView[] }>;
-}
-
-export async function retryDeadLetter(id: string) {
-  const res = await fetch(`/api/v1/settings/notification-delivery/dead-letters/${id}/retry`, {
-    method: "POST"
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to retry dead letter" }));
-    throw new Error(error.error || "Failed to retry dead letter");
-  }
-  return res.json();
-}
-
-export async function resolveDeadLetter(id: string, resolution: string, note?: string) {
-  const res = await fetch(`/api/v1/settings/notification-delivery/dead-letters/${id}/resolve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resolution, note })
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to resolve dead letter" }));
-    throw new Error(error.error || "Failed to resolve dead letter");
-  }
-  return res.json();
-}
-
-export async function reconcileDeadLetters() {
-  const res = await fetch(`/api/v1/settings/notification-delivery/dead-letters/reconcile`, {
-    method: "POST"
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to reconcile dead letters" }));
-    throw new Error(error.error || "Failed to reconcile dead letters");
-  }
-  return res.json();
-}
-
-export interface WebhookDestinationView {
-  id: string;
-  name: string;
-  enabled: boolean;
-  priority: number;
-  isDefault: boolean;
-  routeKinds: string[];
-  routeSeverities: string[];
-  routePriorities: string[];
-  failoverEnabled: boolean;
-  timeoutMs: number;
-  maxAttempts: number;
-  payloadFormat: string;
-  payloadFields: string[];
-  includeActionHref: boolean;
-  includeDeliveryMetadata: boolean;
-  includeRoutingMetadata: boolean;
-  safeEndpointLabel: string;
-  lastSuccessAt?: string;
-  lastFailureAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export async function getWebhookDestinations(): Promise<{ destinations: WebhookDestinationView[] }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations`, {
-    headers: { "x-local-user-id": "local-user" },
-    cache: "no-store"
-  });
-  if (!response.ok) throw new Error("Failed to fetch webhook destinations");
-  return response.json();
-}
-
-export async function createWebhookDestination(data: any): Promise<{ id: string; secret: string }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(data)
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to create webhook destination");
-  }
-  return response.json();
-}
-
-export async function updateWebhookDestination(id: string, data: any): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(data)
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to update webhook destination");
-  }
-  return response.json();
-}
-
-export async function rotateWebhookDestinationSecret(id: string): Promise<{ secret: string }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations/${id}/rotate-secret`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to rotate secret");
-  }
-  return response.json();
-}
-
-export async function testWebhookDestination(id: string): Promise<{ queued: true; jobId: string }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations/${id}/test`, {
-    method: "POST",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to test destination");
-  }
-  return response.json();
-}
-
-export async function deleteWebhookDestination(id: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations/${id}`, {
-    method: "DELETE",
-    headers: { "x-local-user-id": "local-user" }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to delete destination");
-  }
-  return response.json();
-}
-
-export async function previewWebhookRoutePlan(data: any): Promise<{ plan: any }> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/routes/preview`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(data)
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to preview routes");
-  }
-  return response.json();
-}
-
-export interface WebhookPayloadPreview {
-  payload: Record<string, unknown>;
-  sizeBytes: number;
-  schema: string;
-  format: string;
-  includedFields: string[];
-  warnings: string[];
-}
-
-export async function previewWebhookPayload(id: string, sampleData?: any): Promise<WebhookPayloadPreview> {
-  const response = await fetch(`${API_BASE_URL}/settings/notification-delivery/webhook-destinations/${id}/payload-preview`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-local-user-id": "local-user" },
-    body: JSON.stringify(sampleData || {})
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to preview payload");
-  }
-  return response.json();
-}
-
 export type WorkspaceQuotaResource =
   | "members"
   | "pendingInvites"
   | "apiKeys"
   | "providerConnections"
-  | "webhookDestinations"
   | "diagnosticsBaselines"
   | "monthlyApiRequests"
   | "monthlyInviteEmails";
@@ -1700,7 +1414,6 @@ export interface UpdateQuotaPatch {
   maxInvites?: number | null;
   maxApiKeys?: number | null;
   maxProviderConnections?: number | null;
-  maxWebhookDestinations?: number | null;
   maxDiagnosticsBaselines?: number | null;
   maxMonthlyApiRequests?: number | null;
   maxMonthlyInviteEmails?: number | null;
@@ -1873,7 +1586,6 @@ export interface WorkspaceAdminOverview {
   notifications: { unread: number; criticalRecent: number };
   providers: { usable: number; requiresAttention: number };
   emailDelivery: { enabled: boolean; provider: string; dryRun: boolean; realSendPossible: boolean };
-  webhooks: { destinations: number; deadLetters: number };
   diagnostics: { openDriftAlerts: number };
 }
 

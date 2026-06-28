@@ -7,7 +7,6 @@ export type WorkspaceQuotaResource =
   | 'pendingInvites'
   | 'apiKeys'
   | 'providerConnections'
-  | 'webhookDestinations'
   | 'diagnosticsBaselines'
   | 'monthlyApiRequests'
   | 'monthlyInviteEmails';
@@ -18,7 +17,6 @@ export type WorkspaceQuotaSource =
   | 'workspace_member_enable'
   | 'api_key_create'
   | 'provider_connection_create'
-  | 'webhook_destination_create'
   | 'diagnostics_baseline_create'
   | 'openai_compat_chat'
   | 'internal_chat'
@@ -43,7 +41,6 @@ export interface UpdateQuotaPatch {
   maxInvites?: number | null;
   maxApiKeys?: number | null;
   maxProviderConnections?: number | null;
-  maxWebhookDestinations?: number | null;
   maxDiagnosticsBaselines?: number | null;
   maxMonthlyApiRequests?: number | null;
   maxMonthlyInviteEmails?: number | null;
@@ -60,7 +57,6 @@ function getDefaultQuotaLimits() {
     maxInvites: null,
     maxApiKeys: null,
     maxProviderConnections: null,
-    maxWebhookDestinations: null,
     maxDiagnosticsBaselines: null,
     maxMonthlyApiRequests: null,
     maxMonthlyInviteEmails: null,
@@ -108,7 +104,6 @@ export async function getWorkspaceUsageSummary(params: {
     pendingInvitesCount,
     apiKeysCount,
     providerConnectionsCount,
-    webhookDestinationsCount,
     diagnosticsBaselinesCount,
     monthlyApiRequestsCount,
     monthlyInviteEmailsCount,
@@ -128,19 +123,6 @@ export async function getWorkspaceUsageSummary(params: {
     // providerConnections
     prisma.providerConnection.count({
       where: { workspaceId },
-    }),
-    // webhookDestinations
-    prisma.notificationWebhookDestination.count({
-      where: {
-        userId: {
-          in: (
-            await prisma.workspaceMembership.findMany({
-              where: { workspaceId },
-              select: { userId: true },
-            })
-          ).map((m: any) => m.userId),
-        },
-      },
     }),
     // diagnosticsBaselines
     prisma.providerDiagnosticsBaseline.count({
@@ -183,7 +165,6 @@ export async function getWorkspaceUsageSummary(params: {
       mapStatus('pendingInvites', pendingInvitesCount, quota.maxInvites),
       mapStatus('apiKeys', apiKeysCount, quota.maxApiKeys),
       mapStatus('providerConnections', providerConnectionsCount, quota.maxProviderConnections),
-      mapStatus('webhookDestinations', webhookDestinationsCount, quota.maxWebhookDestinations),
       mapStatus('diagnosticsBaselines', diagnosticsBaselinesCount, quota.maxDiagnosticsBaselines),
       mapStatus('monthlyApiRequests', monthlyApiRequestsCount, quota.maxMonthlyApiRequests),
       mapStatus('monthlyInviteEmails', monthlyInviteEmailsCount, quota.maxMonthlyInviteEmails),
@@ -325,7 +306,6 @@ export async function updateWorkspaceQuota(params: {
       maxInvites: patch.maxInvites,
       maxApiKeys: patch.maxApiKeys,
       maxProviderConnections: patch.maxProviderConnections,
-      maxWebhookDestinations: patch.maxWebhookDestinations,
       maxDiagnosticsBaselines: patch.maxDiagnosticsBaselines,
       maxMonthlyApiRequests: patch.maxMonthlyApiRequests,
       maxMonthlyInviteEmails: patch.maxMonthlyInviteEmails,

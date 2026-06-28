@@ -42,15 +42,7 @@ export async function cleanupTestUserData(userId: string): Promise<void> {
   await prisma.internalApiKey.deleteMany({ where: { userId } });
 
   // 2. Notifications
-  await prisma.notificationDeliveryAttempt.deleteMany({
-    where: { userId }
-  });
-  await prisma.notificationDeadLetter.deleteMany({
-    where: { userId }
-  });
   await prisma.notificationEvent.deleteMany({ where: { userId } });
-  await prisma.notificationWebhookDestination.deleteMany({ where: { userId } });
-  await prisma.notificationDeliveryPreference.deleteMany({ where: { userId } });
 
   // 3. Provider Settings & Cache & History
   await prisma.providerDiagnosticsDriftAlert.deleteMany({ where: { userId } });

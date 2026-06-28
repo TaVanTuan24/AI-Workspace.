@@ -9,11 +9,7 @@ const envSchema = z.object({
   BROWSER_PROFILE_ROOT: z.string().default(".data/browser-profiles"),
   CHAT_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(1),
   CHAT_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
-  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
-  NOTIFICATION_WEBHOOK_RETRY_ENABLED: z.coerce.boolean().default(true),
-  NOTIFICATION_WEBHOOK_RETRY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
-  NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS: z.coerce.number().int().positive().default(30000),
-  NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(900000)
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000)
 });
 
 export type WorkerEnv = z.infer<typeof envSchema>;
@@ -52,10 +48,6 @@ export function parseEnv(raw: NodeJS.ProcessEnv, options: ParseOptions = {}): Wo
 
   if (isProduction && !raw.DATABASE_URL) {
     errors.push("DATABASE_URL is required in production.");
-  }
-
-  if (parsed.NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS < parsed.NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS) {
-    errors.push("NOTIFICATION_WEBHOOK_RETRY_MAX_DELAY_MS must be greater than or equal to NOTIFICATION_WEBHOOK_RETRY_BASE_DELAY_MS.");
   }
 
   if (errors.length > 0) {

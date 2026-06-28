@@ -11,9 +11,7 @@ let content = fs.readFileSync(schemaPath, 'utf8');
 const modelsToUpdate = [
     'ProviderConnection', 'ProviderDiagnosticsBaseline', 'ProviderDiagnosticsDriftAlert',
     'ProviderDiagnosticsRun', 'ProviderHealthIncident', 'InternalApiKey',
-    'InternalApiUsageLog', 'UserModelPreference', 'ProviderRateLimitSetting',
-    'NotificationDeliveryPreference', 'NotificationDeliveryAttempt',
-    'NotificationDeadLetter', 'NotificationWebhookDestination'
+    'InternalApiUsageLog', 'UserModelPreference', 'ProviderRateLimitSetting'
 ];
 
 for (const model of modelsToUpdate) {
@@ -34,8 +32,8 @@ for (const model of modelsToUpdate) {
     // Replace userId with workspaceId and userId
     block = block.replace(/(\n\s+)(userId\s+String\s+@map\("user_id"\))/, '$1workspaceId String? @map("workspace_id")$1workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)$1$2');
 
-    // For NotificationDeadLetter, it looks like `userId String @map("user_id")` but might be single space.
-    // The above regex handles standard formatting. Let's be safer:
+    // Some models use slightly different spacing. The above regex handles standard
+    // formatting; this fallback covers the rest.
     if (!block.includes('workspaceId String?')) {
          block = block.replace(/(\n\s*)(userId\s+String\s+@map\("user_id"\))/, '$1workspaceId String? @map("workspace_id")$1workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)$1$2');
     }

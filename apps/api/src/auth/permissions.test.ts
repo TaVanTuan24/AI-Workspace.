@@ -10,7 +10,6 @@ describe("workspace permission policy", () => {
     for (const role of ["owner", "admin"]) {
       expect(hasPermission(role, "apiKeys.write")).toBe(true);
       expect(hasPermission(role, "providerConnections.write")).toBe(true);
-      expect(hasPermission(role, "webhooks.write")).toBe(true);
       expect(hasPermission(role, "models.write")).toBe(true);
     }
   });
@@ -30,7 +29,6 @@ describe("workspace permission policy", () => {
     expect(hasPermission("member", "models.read")).toBe(true);
     expect(hasPermission("member", "apiKeys.write")).toBe(false);
     expect(hasPermission("member", "providerConnections.write")).toBe(false);
-    expect(hasPermission("member", "webhooks.write")).toBe(false);
     expect(hasPermission("member", "models.write")).toBe(false);
   });
 

@@ -9,11 +9,7 @@ const WORKSPACE_MODELS = [
   "internal_api_keys",
   "internal_api_usage_logs",
   "user_model_preferences",
-  "provider_rate_limit_settings",
-  "notification_delivery_preferences",
-  "notification_delivery_attempts",
-  "notification_dead_letters",
-  "notification_webhook_destinations"
+  "provider_rate_limit_settings"
 ];
 
 export interface BackfillSummary {

@@ -32,7 +32,6 @@ describe("serializationSafety", () => {
       notifications: { unread: 5, criticalRecent: 0 },
       providers: { usable: 2, requiresAttention: 1 },
       emailDelivery: { enabled: true, provider: "noop", dryRun: true, realSendPossible: false },
-      webhooks: { destinations: 1, deadLetters: 0 },
       diagnostics: { openDriftAlerts: 0 },
     };
     expect(() => assertSafeSerializedPayload(payload)).not.toThrow();

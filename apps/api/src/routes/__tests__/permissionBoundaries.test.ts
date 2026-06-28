@@ -2,7 +2,6 @@ import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiKeyRoutes } from "../apiKeys.js";
 import { modelPreferenceRoutes } from "../modelPreferences.js";
-import { notificationDeliveryRoutes } from "../notificationDelivery.js";
 import { providerHealthRoutes } from "../providerHealth.js";
 import { providerRateLimitRoutes } from "../providerRateLimits.js";
 import { providerRoutes } from "../providers.js";
@@ -70,10 +69,6 @@ vi.mock("../../services/modelPreferenceService.js", () => ({
   updateModelPreferences: vi.fn()
 }));
 
-vi.mock("../../services/notificationWebhookRetryQueue.js", () => ({
-  enqueueWebhookDeliveryRetry: vi.fn()
-}));
-
 vi.mock("../../services/providerRateLimitService.js", () => ({
   listProviderRateLimitSettings: vi.fn(),
   updateProviderRateLimitSetting: vi.fn()
@@ -131,15 +126,6 @@ describe("route permission boundaries", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "permission_denied" });
-  });
-
-  it("denies member webhook secret rotation", async () => {
-    const app = await buildApp(notificationDeliveryRoutes);
-    const response = await app.inject({
-      method: "POST",
-      url: "/settings/notification-delivery/webhook/rotate-secret"
-    });
-    expect(response.statusCode).toBe(403);
   });
 
   it("denies member provider diagnostics actions", async () => {

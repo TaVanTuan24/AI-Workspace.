@@ -268,7 +268,6 @@ function formatResourceName(resource: string) {
     pendingInvites: "Pending Invites",
     apiKeys: "API Keys",
     providerConnections: "Provider Connections",
-    webhookDestinations: "Webhook Destinations",
     diagnosticsBaselines: "Diagnostics Baselines",
     monthlyApiRequests: "API Requests (Monthly)",
     monthlyInviteEmails: "Invite Emails (Monthly)"

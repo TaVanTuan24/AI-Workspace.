@@ -171,7 +171,7 @@ Central configuration at `/settings`, with overview cards (provider readiness, m
 | `/settings/api-usage` | Operational usage metrics (safe metadata only). |
 | `/settings/provider-health` | View and force-refresh session/provider readiness. |
 | `/settings/provider-rate-limits` | Per-provider request throttles. |
-| `/settings/notifications` | Alert preferences, history, and delivery channels. |
+| `/settings/notifications` | In-app alert preferences and notification history. |
 | `/settings/conversations` | Export/import chat history (plain or encrypted). |
 | `/settings/quota` | Workspace quota configuration and events. |
 | `/settings/activity` | Workspace activity log. |
@@ -209,7 +209,7 @@ Session and readiness problems surface before a chat/API request fails — via a
 
 - **History** — persistent, deduplicated alerts in the `notification_events` table (safe metadata only), with read/unread tracking and an unread-count nav badge.
 - **Preferences** — per-user, at `/settings/notifications`: provider session alerts, no-usable-model alerts, and provider rate-limit spike alerts (with a configurable 24h threshold).
-- **Delivery channels** — in-app (default). Webhook delivery posts signed payloads (`X-UAIW-Signature: sha256=…` over `timestamp.body`), with SSRF protection, strict timeouts, and retry/dead-letter handling. Email/Slack are scaffolded.
+Notifications are surfaced in-app only (global banner, settings badges, and history). There is no outbound delivery (webhook/email/Slack).
 
 Critical no-usable-model warnings are not dismissible. Dismissal is local UI state only and never changes provider status.
 
@@ -233,7 +233,7 @@ The app runs single-workspace by default; the default Local Workspace handles us
 
 - **Roles** (`User.role`): `owner` and `admin` (full admin), `member` (read-oriented), `viewer` (read-only). Existing/local users default to `owner`. Backend permission guards are the source of truth; the UI only mirrors them. Denials return `{ "error": "permission_denied" }`.
 - **User management** (`/settings/users`) — owners can list users, review role-audit events, and change roles. The last owner cannot be demoted. User lists and audit events expose only safe fields (id, email, role, timestamps).
-- **Workspace switching/creation** — new workspaces start empty; no data is copied (no sessions, keys, webhooks, or policies). Switching reloads the UI to prevent cross-workspace leakage.
+- **Workspace switching/creation** — new workspaces start empty; no data is copied (no sessions, API keys, or settings). Switching reloads the UI to prevent cross-workspace leakage.
 - **Invites** — owner-only. Tokens are SHA-256 hashed at rest and shown once; they expire after 7 days with scheduled cleanup. Email delivery (`WORKSPACE_INVITE_EMAIL_PROVIDER`: `noop` / `console_dry_run` / `smtp`) is dry-run by default; real SMTP send requires explicit opt-in and is hard-blocked in tests.
 
 ---

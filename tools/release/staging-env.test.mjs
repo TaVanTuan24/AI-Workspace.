@@ -26,7 +26,7 @@ describe("staging-env", () => {
     assert.match(content, /Generated local staging env/);
     assert.equal(content.includes("replace-with-local-random-secret"), false);
     assert.equal(content.includes("replace-with-local-32-byte-base64-key"), false);
-    assert.equal(summary.generatedKeysCount >= 5, true);
+    assert.equal(summary.generatedKeysCount >= 4, true);
     for (const key of summary.generatedKeys) {
       const value = content.match(new RegExp(`^${key}=(.+)$`, "m"))?.[1];
       assert.ok(value);
@@ -54,7 +54,6 @@ describe("staging-env", () => {
   it("generates sufficiently strong required secrets and no provider credentials", () => {
     const rendered = renderEnv([
       "SESSION_MASTER_KEY=replace-with-local-32-byte-base64-key",
-      "NOTIFICATION_SECRET_ENCRYPTION_KEY=replace-with-local-32-byte-base64-key",
       "APP_SECRET=replace-with-local-random-secret",
       "API_KEY_HASH_SECRET=replace-with-local-random-secret",
       "INTERNAL_API_KEY=replace-with-local-random-internal-api-key",
@@ -62,7 +61,6 @@ describe("staging-env", () => {
     ].join("\n"));
 
     assert.equal(Buffer.from(rendered.values.SESSION_MASTER_KEY, "base64").length, 32);
-    assert.equal(Buffer.from(rendered.values.NOTIFICATION_SECRET_ENCRYPTION_KEY, "base64").length, 32);
     assert.equal(rendered.values.INTERNAL_API_KEY.length >= 24, true);
     assert.equal(rendered.values.PROVIDER_API_KEY, "");
   });
@@ -78,7 +76,6 @@ describe("staging-env", () => {
       content: "SESSION_MASTER_KEY=replace-with-local-32-byte-base64-key\n",
       values: {
         SESSION_MASTER_KEY: "replace-with-local-32-byte-base64-key",
-        NOTIFICATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, "a").toString("base64"),
         APP_SECRET: "x".repeat(32),
         API_KEY_HASH_SECRET: "x".repeat(32),
         INTERNAL_API_KEY: "x".repeat(32),

@@ -2,7 +2,6 @@ import { prisma } from "./prisma.js";
 import { env } from "../config/env.js";
 import type { NotificationEvent } from "@prisma/client";
 import type { WorkspaceNotification, NotificationEventView, ProviderId } from "@uaiw/shared/types/provider.js";
-import { deliverNotificationEvent } from "./notificationDeliveryService.js";
 
 export function sanitizeNotificationMetadata(input: unknown): Record<string, unknown> {
   if (typeof input !== "object" || input === null) return {};

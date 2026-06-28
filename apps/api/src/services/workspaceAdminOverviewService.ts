@@ -15,7 +15,6 @@ export interface WorkspaceAdminOverviewDTO {
   notifications: { unread: number; criticalRecent: number };
   providers: { usable: number; requiresAttention: number };
   emailDelivery: { enabled: boolean; provider: string; dryRun: boolean; realSendPossible: boolean };
-  webhooks: { destinations: number; deadLetters: number };
   diagnostics: { openDriftAlerts: number };
 }
 
@@ -55,7 +54,7 @@ export async function getWorkspaceAdminOverview(params: {
   // Second wave of parallel queries
   const [
     unreadNotifications, criticalNotifications,
-    webhookDestinations, deadLetters, openDriftAlerts,
+    openDriftAlerts,
     quotaSummary,
   ] = await Promise.all([
     userIds.length > 0
@@ -70,16 +69,6 @@ export async function getWorkspaceAdminOverview(params: {
             severity: "critical",
             createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
           },
-        })
-      : Promise.resolve(0),
-    userIds.length > 0
-      ? prisma.notificationWebhookDestination.count({
-          where: { userId: { in: userIds } },
-        })
-      : Promise.resolve(0),
-    userIds.length > 0
-      ? prisma.notificationDeadLetter.count({
-          where: { userId: { in: userIds }, status: "open" },
         })
       : Promise.resolve(0),
     userIds.length > 0
@@ -134,7 +123,6 @@ export async function getWorkspaceAdminOverview(params: {
       dryRun: env.WORKSPACE_INVITE_EMAIL_DRY_RUN,
       realSendPossible: env.WORKSPACE_INVITE_EMAIL_ALLOW_REAL_SEND && env.WORKSPACE_INVITE_EMAIL_PROVIDER === "smtp",
     },
-    webhooks: { destinations: webhookDestinations, deadLetters },
     diagnostics: { openDriftAlerts },
   };
 }

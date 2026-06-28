@@ -22,10 +22,6 @@ model Workspace {
   InternalApiUsageLog            InternalApiUsageLog[]
   UserModelPreference            UserModelPreference[]
   ProviderRateLimitSetting       ProviderRateLimitSetting[]
-  NotificationDeliveryPreference NotificationDeliveryPreference[]
-  NotificationDeliveryAttempt    NotificationDeliveryAttempt[]
-  NotificationDeadLetter         NotificationDeadLetter[]
-  NotificationWebhookDestination NotificationWebhookDestination[]
   ProviderHealthIncident         ProviderHealthIncident[]
   ProviderDiagnosticsRun         ProviderDiagnosticsRun[]
   memberships                    WorkspaceMembership[]
@@ -60,10 +56,6 @@ model User {
   modelPreferences                UserModelPreference[]
   providerRateLimitSettings       ProviderRateLimitSetting[]
   notificationEvents              NotificationEvent[]
-  notificationDeliveryPreferences NotificationDeliveryPreference[]
-  notificationDeliveryAttempts    NotificationDeliveryAttempt[]
-  notificationDeadLetters         NotificationDeadLetter[]
-  notificationWebhookDestinations NotificationWebhookDestination[]
   providerHealthIncidents         ProviderHealthIncident[]
   liveSubModelCaches              ProviderLiveSubModelCache[]
   providerDiagnosticsRuns         ProviderDiagnosticsRun[]
@@ -232,7 +224,6 @@ model WorkspaceQuota {
   maxInvites              Int? @map("max_invites")
   maxApiKeys              Int? @map("max_api_keys")
   maxProviderConnections  Int? @map("max_provider_connections")
-  maxWebhookDestinations  Int? @map("max_webhook_destinations")
   maxDiagnosticsBaselines Int? @map("max_diagnostics_baselines")
   maxMonthlyApiRequests   Int? @map("max_monthly_api_requests")
   maxMonthlyInviteEmails  Int? @map("max_monthly_invite_emails")
@@ -497,61 +488,12 @@ model NotificationEvent {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   user             User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deliveryAttempts NotificationDeliveryAttempt[]
-  deadLetters      NotificationDeadLetter[]
 
   @@unique([userId, fingerprint])
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([userId, kind])
   @@map("notification_events")
-}
-
-model NotificationDeliveryPreference {
-  id          String     @id @default(cuid())
-  workspaceId String?    @map("workspace_id")
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId      String     @map("user_id")
-  channel     String
-  enabled     Boolean    @default(false)
-  configJson  String?    @map("config_json")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, channel])
-  @@index([userId])
-  @@index([workspaceId])
-  @@map("notification_delivery_preferences")
-}
-
-model NotificationDeliveryAttempt {
-  id                  String     @id @default(cuid())
-  workspaceId         String?    @map("workspace_id")
-  workspace           Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId              String     @map("user_id")
-  notificationEventId String     @map("notification_event_id")
-  channel             String
-  status              String
-  errorCode           String?    @map("error_code")
-  attemptedAt         DateTime   @default(now()) @map("attempted_at")
-  metadataJson        String?    @map("metadata_json")
-
-  attemptNumber Int       @default(1) @map("attempt_number")
-  retryable     Boolean   @default(false)
-  nextRetryAt   DateTime? @map("next_retry_at")
-  jobId         String?   @map("job_id")
-
-  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notificationEvent NotificationEvent        @relation(fields: [notificationEventId], references: [id], onDelete: Cascade)
-  deadLetters       NotificationDeadLetter[]
-
-  @@index([userId, attemptedAt])
-  @@index([notificationEventId])
-  @@index([userId, channel])
-  @@index([workspaceId])
-  @@map("notification_delivery_attempts")
 }
 
 model ProviderLiveSubModelCache {
@@ -570,80 +512,6 @@ model ProviderLiveSubModelCache {
   @@unique([userId, provider])
   @@index([userId, detectedAt])
   @@map("provider_live_sub_model_cache")
-}
-
-model NotificationDeadLetter {
-  id                  String     @id @default(cuid())
-  workspaceId         String?    @map("workspace_id")
-  workspace           Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId              String     @map("user_id")
-  notificationEventId String     @map("notification_event_id")
-  deliveryAttemptId   String?    @map("delivery_attempt_id")
-  channel             String
-  reason              String
-  failureCode         String?    @map("failure_code")
-  retryable           Boolean    @default(true)
-  firstFailedAt       DateTime   @map("first_failed_at")
-  deadLetteredAt      DateTime   @default(now()) @map("dead_lettered_at")
-  lastRetryAt         DateTime?  @map("last_retry_at")
-  resolvedAt          DateTime?  @map("resolved_at")
-  retryCount          Int        @default(0) @map("retry_count")
-  metadataJson        String?    @map("metadata_json")
-  status              String     @default("open")
-  createdAt           DateTime   @default(now()) @map("created_at")
-  updatedAt           DateTime   @updatedAt @map("updated_at")
-
-  user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notificationEvent NotificationEvent            @relation(fields: [notificationEventId], references: [id], onDelete: Cascade)
-  deliveryAttempt   NotificationDeliveryAttempt? @relation(fields: [deliveryAttemptId], references: [id], onDelete: SetNull)
-
-  @@index([userId, deadLetteredAt])
-  @@index([userId, channel])
-  @@index([userId, notificationEventId])
-  @@index([userId, status])
-  @@index([workspaceId])
-  @@map("notification_dead_letters")
-}
-
-model NotificationWebhookDestination {
-  id          String     @id @default(cuid())
-  workspaceId String?    @map("workspace_id")
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId      String     @map("user_id")
-  name        String
-  enabled     Boolean    @default(true)
-
-  encryptedUrl           String @map("encrypted_url")
-  encryptedSigningSecret String @map("encrypted_signing_secret")
-
-  priority  Int     @default(100)
-  isDefault Boolean @default(false) @map("is_default")
-
-  routeKinds      String? @map("route_kinds") // JSON array
-  routeSeverities String? @map("route_severities") // JSON array
-  routePriorities String? @map("route_priorities") // JSON array
-
-  failoverEnabled Boolean @default(true) @map("failover_enabled")
-  maxAttempts     Int?    @map("max_attempts")
-  timeoutMs       Int?    @map("timeout_ms")
-
-  payloadFormat           String  @default("uaiw_default") @map("payload_format")
-  payloadFields           String? @map("payload_fields") // JSON array of allowlisted field keys
-  includeActionHref       Boolean @default(true) @map("include_action_href")
-  includeDeliveryMetadata Boolean @default(true) @map("include_delivery_metadata")
-  includeRoutingMetadata  Boolean @default(true) @map("include_routing_metadata")
-
-  lastSuccessAt DateTime? @map("last_success_at")
-  lastFailureAt DateTime? @map("last_failure_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, enabled])
-  @@index([userId, priority])
-  @@index([workspaceId])
-  @@map("notification_webhook_destinations")
 }
 
 model ProviderHealthIncident {

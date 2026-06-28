@@ -18,7 +18,6 @@ const SAFE_SETTINGS_ENDPOINTS = [
   "/settings/overview",
   "/settings/provider-health/incidents?limit=10",
   "/settings/provider-health/diagnostics-runs?limit=10",
-  "/settings/notification-delivery/dead-letters?limit=10",
   "/settings/workspace/admin-overview",
   "/settings/workspace/activity",
   "/settings/workspace/schedulers",

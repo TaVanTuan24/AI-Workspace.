@@ -9,8 +9,6 @@ export const PERMISSIONS = [
   "providerConnections.write",
   "providerDiagnostics.read",
   "providerDiagnostics.action",
-  "webhooks.read",
-  "webhooks.write",
   "notifications.read",
   "notifications.write",
   "usage.read",
