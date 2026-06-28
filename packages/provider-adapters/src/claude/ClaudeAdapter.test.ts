@@ -12,7 +12,6 @@ describe("ClaudeAdapter", () => {
 
   it("exports non-empty URL and selector groups", () => {
     expect(CLAUDE_URLS.primaryLoginUrl).toBe("https://claude.ai");
-    expect(CLAUDE_URLS.fallbackLoginUrls.length).toBeGreaterThan(0);
     expect(CLAUDE_SELECTORS.composerCandidates.length).toBeGreaterThan(0);
     expect(CLAUDE_SELECTORS.sendButtonCandidates.length).toBeGreaterThan(0);
     expect(CLAUDE_SELECTORS.responseCandidates.length).toBeGreaterThan(0);

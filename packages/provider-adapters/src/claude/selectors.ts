@@ -1,6 +1,5 @@
 export const CLAUDE_URLS = {
-  primaryLoginUrl: "https://claude.ai",
-  fallbackLoginUrls: ["https://claude.ai/new", "https://claude.ai/chats"]
+  primaryLoginUrl: "https://claude.ai"
 } as const;
 
 export const CLAUDE_SELECTORS = {

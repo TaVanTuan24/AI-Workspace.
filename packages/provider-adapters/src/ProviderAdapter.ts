@@ -4,7 +4,6 @@ import type {
   ProviderAuthStatus,
   ProviderEvent,
   ProviderId,
-  ProviderSubModel,
   SelectSubModelResult,
   ProviderUiDiagnosis,
   LiveSubModelDetectionResult
@@ -66,7 +65,6 @@ export interface ProviderAdapter {
   importSession(context: BrowserContext, sessionState: unknown): Promise<void>;
   inspectUi?(context: BrowserContext): Promise<ProviderUiInspection>;
 
-  listSubModels?(context: BrowserContext): Promise<ProviderSubModel[]>;
   selectSubModel?(context: BrowserContext, subModelId: string): Promise<SelectSubModelResult>;
   detectLiveSubModels?(context: BrowserContext): Promise<LiveSubModelDetectionResult>;
   diagnoseUi?(context: BrowserContext): Promise<ProviderUiDiagnosis>;
