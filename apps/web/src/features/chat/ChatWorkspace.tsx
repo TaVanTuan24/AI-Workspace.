@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Download, MessageSquare, Paperclip, Pencil, Plus, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, Download, MessageSquare, Paperclip, Pencil, Plus, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import type { ProviderConnectionSummary, ProviderEvent, ProviderId } from "@uaiw/shared/types/provider";
 import {
@@ -121,6 +121,7 @@ export function ChatWorkspace() {
   // the running transcript, and a run/abort flag.
   const [selectedDiscussion, setSelectedDiscussion] = useState<ProviderId[]>(["gemini", "chatgpt", "claude"]);
   const [discussionRounds, setDiscussionRounds] = useState(2);
+  const [discussionTopic, setDiscussionTopic] = useState("");
   const [discussionEntries, setDiscussionEntries] = useState<DiscussionEntry[]>([]);
   const [discussionRunning, setDiscussionRunning] = useState(false);
   const [discussionError, setDiscussionError] = useState("");
@@ -470,6 +471,7 @@ export function ChatWorkspace() {
     setDiscussionError("");
     setDiscussionRunning(true);
     setDiscussionEntries([]);
+    setDiscussionTopic(topic);
     setPrompt("");
 
     const transcript: Array<{ speaker: string; text: string }> = [];
@@ -527,6 +529,26 @@ export function ChatWorkspace() {
           : e
       )
     );
+  }
+
+  function exportDiscussion() {
+    if (discussionEntries.length === 0) return;
+    const lines: string[] = [`# Discussion: ${discussionTopic}`, ""];
+    let lastRound = 0;
+    for (const entry of discussionEntries) {
+      if (entry.round !== lastRound) {
+        lines.push(`## Round ${entry.round}`, "");
+        lastRound = entry.round;
+      }
+      lines.push(`### ${entry.displayName}`, "", entry.text || "_(no response)_", "");
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `discussion-${Date.now()}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   async function openThread(id: string) {
@@ -930,6 +952,14 @@ export function ChatWorkspace() {
           maxLength={20_000}
           disabled={discussionRunning}
           onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            // Ctrl/Cmd+Enter sends (or starts a discussion) without leaving the box.
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              if (mode === "discussion") void runDiscussion();
+              else void submit();
+            }
+          }}
         />
 
         {mode === "discussion" ? (
@@ -972,6 +1002,15 @@ export function ChatWorkspace() {
                   Start discussion
                 </button>
               )}
+              <button
+                title="Export discussion as Markdown"
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
+                disabled={discussionEntries.length === 0}
+                onClick={exportDiscussion}
+              >
+                <Download className="h-4 w-4" />
+              </button>
               <button
                 title="Clear discussion"
                 type="button"
@@ -1245,6 +1284,7 @@ function StreamingResponseCard({
         >
           Retry
         </button>
+        <CopyButton text={response.text} />
       </div>
       {response.message ? (
         <div className="mt-4 rounded-md border border-warn/40 bg-amber-50 p-3 text-sm text-amber-950">
@@ -1435,7 +1475,10 @@ function DiscussionTranscript({ entries, running }: { entries: DiscussionEntry[]
             <article className="rounded-md border border-border bg-panel p-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold">{entry.displayName}</h2>
-                <span className="rounded-md bg-surface px-2 py-1 text-xs text-muted">{entry.status}</span>
+                <div className="flex items-center gap-2">
+                  <CopyButton text={entry.text} />
+                  <span className="rounded-md bg-surface px-2 py-1 text-xs text-muted">{entry.status}</span>
+                </div>
               </div>
               {entry.message ? (
                 <div className="mt-3 rounded-md border border-warn/40 bg-amber-50 p-3 text-sm text-amber-950">
@@ -1456,6 +1499,30 @@ function DiscussionTranscript({ entries, running }: { entries: DiscussionEntry[]
       })}
       {running ? <div className="text-center text-xs text-muted">Discussion in progress…</div> : null}
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!text) return null;
+  return (
+    <button
+      type="button"
+      title="Copy response"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable — ignore */
+        }
+      }}
+      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:bg-surface"
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 
