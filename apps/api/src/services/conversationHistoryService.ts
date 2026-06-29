@@ -3,6 +3,7 @@ import { prisma } from "./prisma.js";
 export interface ThreadListItem {
   id: string;
   title: string | null;
+  kind: "chat" | "discussion";
   createdAt: string;
   updatedAt: string;
   messageCount: number;
@@ -91,11 +92,14 @@ export async function listThreads(
   const page = hasMore ? rows.slice(0, limit) : rows;
   const nextCursor = hasMore ? page[page.length - 1]!.id : null;
 
-  const providersByThread = await getProvidersByThread(page.map((t) => t.id));
+  const pageIds = page.map((t) => t.id);
+  const providersByThread = await getProvidersByThread(pageIds);
+  const discussionIds = await getDiscussionThreadIds(pageIds);
 
   const threads: ThreadListItem[] = page.map((t) => ({
     id: t.id,
     title: t.title,
+    kind: discussionIds.has(t.id) ? "discussion" : "chat",
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
     messageCount: t._count.messages,
@@ -103,6 +107,18 @@ export async function listThreads(
   }));
 
   return { threads, nextCursor };
+}
+
+// Threads with discussion-tagged messages, detected via metadata (survives
+// renaming the thread title, unlike a title-prefix heuristic).
+async function getDiscussionThreadIds(threadIds: string[]): Promise<Set<string>> {
+  if (threadIds.length === 0) return new Set();
+  const rows = await prisma.message.findMany({
+    where: { threadId: { in: threadIds }, metadataJson: { contains: '"kind":"discussion"' } },
+    distinct: ["threadId"],
+    select: { threadId: true }
+  });
+  return new Set(rows.map((row) => row.threadId));
 }
 
 async function getProvidersByThread(threadIds: string[]): Promise<Map<string, string[]>> {
@@ -242,9 +258,11 @@ export async function renameThread(
   if (!updated) return null;
 
   const providersByThread = await getProvidersByThread([updated.id]);
+  const discussionIds = await getDiscussionThreadIds([updated.id]);
   return {
     id: updated.id,
     title: updated.title,
+    kind: discussionIds.has(updated.id) ? "discussion" : "chat",
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     messageCount: updated._count.messages,

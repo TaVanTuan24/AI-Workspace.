@@ -1491,7 +1491,14 @@ function HistoryRow({
       ) : (
         <>
           <button type="button" className="block w-full text-left" onClick={() => onOpen(thread.id)}>
-            <span className="block truncate font-medium">{thread.title || "Untitled conversation"}</span>
+            <span className="flex items-center gap-1.5">
+              {thread.kind === "discussion" ? (
+                <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                  Discuss
+                </span>
+              ) : null}
+              <span className="truncate font-medium">{thread.title || "Untitled conversation"}</span>
+            </span>
             <span className="mt-0.5 block truncate text-xs text-muted">
               {thread.providers.length ? `${thread.providers.join(", ")} · ` : ""}
               {thread.messageCount} msg{thread.messageCount === 1 ? "" : "s"} · {updated}

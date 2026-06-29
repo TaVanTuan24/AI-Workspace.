@@ -1003,6 +1003,7 @@ export async function apiExportThread(threadId: string) {
 export interface ConversationThreadSummary {
   id: string;
   title: string | null;
+  kind: "chat" | "discussion";
   createdAt: string;
   updatedAt: string;
   messageCount: number;

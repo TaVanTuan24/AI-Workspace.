@@ -148,9 +148,11 @@ describe("conversationHistoryService", () => {
     expect(assistantRounds).toEqual([1, 1, 2]);
     expect(detail!.providers).toEqual(["chatgpt", "gemini"]);
 
-    // It also shows up in the thread list.
+    // It also shows up in the thread list, tagged as a discussion.
     const list = await listThreads(userId);
-    expect(list.threads.some((t) => t.id === threadId)).toBe(true);
+    const listed = list.threads.find((t) => t.id === threadId);
+    expect(listed).toBeDefined();
+    expect(listed!.kind).toBe("discussion");
   });
 
   it("rejects an empty discussion", async () => {
