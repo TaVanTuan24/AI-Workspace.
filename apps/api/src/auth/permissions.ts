@@ -3,6 +3,7 @@ export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
 export const PERMISSIONS = [
   "settings.read",
+  "settings.write",
   "apiKeys.read",
   "apiKeys.write",
   "providerConnections.read",

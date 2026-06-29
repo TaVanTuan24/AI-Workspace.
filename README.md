@@ -359,7 +359,9 @@ curl -f http://localhost:4000/ready
 
 **Storage visibility** — `/settings` shows a Storage card (`GET /settings/storage`) with the on-disk size of the SQLite database (via `PRAGMA`), browser profiles, encrypted session blobs, and local backups.
 
-**Retention cleanup scheduler** — an optional background job (`RETENTION_CLEANUP_SCHEDULER_ENABLED`, off by default; daily interval, Redis-locked) purges expired internal API usage logs (`API_USAGE_RETENTION_DAYS`) and notification events (`NOTIFICATION_EVENT_RETENTION_DAYS`), reusing the same logic as the manual `api-usage:cleanup` / `notification-events:cleanup` scripts. It records runs in the scheduler fleet status. Lower-volume diagnostics/incident cleanups stay manual (`provider-*:cleanup`).
+**Retention cleanup scheduler** — an optional background job (`RETENTION_CLEANUP_SCHEDULER_ENABLED`, off by default; daily interval, Redis-locked) purges expired internal API usage logs (`API_USAGE_RETENTION_DAYS`) and notification events (`NOTIFICATION_EVENT_RETENTION_DAYS`), reusing the same logic as the manual `api-usage:cleanup` / `notification-events:cleanup` scripts. Lower-volume diagnostics/incident cleanups stay manual (`provider-*:cleanup`).
+
+**Maintenance panel** — `/settings` shows scheduler fleet status (`GET /settings/schedulers`: each scheduler's enabled flag, last run, and run/failure counts) and a **Run retention cleanup** button (`POST /settings/storage/retention/run`, `settings.write`) so an operator can purge on demand without waiting for the schedule.
 
 **Backup & restore** — local-first snapshots of your state, the SQLite database and the `.data` directory (browser profiles + encrypted session blobs):
 

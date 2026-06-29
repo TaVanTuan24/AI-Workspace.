@@ -7,6 +7,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 export type WorkspacePermission =
   | "settings.read"
+  | "settings.write"
   | "apiKeys.read"
   | "apiKeys.write"
   | "providerConnections.read"
@@ -1175,6 +1176,45 @@ export async function getStorageStats(): Promise<StorageStats> {
     cache: "no-store"
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to load storage stats"));
+  return response.json();
+}
+
+export interface RetentionCleanupResult {
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  dryRun: boolean;
+  usage: { matched: number; deleted: number };
+  notifications: { matched: number; deleted: number };
+}
+
+export async function runRetentionCleanup(dryRun = false): Promise<RetentionCleanupResult> {
+  const response = await fetch(`${API_BASE_URL}/settings/storage/retention/run`, {
+    method: "POST",
+    headers: { "x-local-user-id": "local-user", "Content-Type": "application/json" },
+    body: JSON.stringify({ dryRun })
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to run retention cleanup"));
+  return response.json();
+}
+
+export interface SchedulerFleetEntry {
+  name: string;
+  enabled: boolean;
+  lastStatus?: string;
+  lastStartedAt?: string;
+  lastFinishedAt?: string;
+  runCount: number;
+  failureCount: number;
+  skippedCount: number;
+}
+
+export async function getSchedulerFleetStatus(): Promise<{ schedulers: SchedulerFleetEntry[] }> {
+  const response = await fetch(`${API_BASE_URL}/settings/schedulers`, {
+    headers: { "x-local-user-id": "local-user" },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load scheduler status"));
   return response.json();
 }
 

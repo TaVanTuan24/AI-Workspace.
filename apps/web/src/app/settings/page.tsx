@@ -22,9 +22,13 @@ import {
   getSettingsOverview,
   getWorkspaceNotifications,
   getStorageStats,
+  getSchedulerFleetStatus,
+  runRetentionCleanup,
   type OnboardingStatus,
   type SettingsOverview,
   type StorageStats,
+  type SchedulerFleetEntry,
+  type RetentionCleanupResult,
   type WorkspaceNotification
 } from "../../lib/api";
 import {
@@ -79,6 +83,9 @@ export default function SettingsOverviewPage() {
   const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [storage, setStorage] = useState<StorageStats | null>(null);
+  const [schedulers, setSchedulers] = useState<SchedulerFleetEntry[]>([]);
+  const [cleanupResult, setCleanupResult] = useState<RetentionCleanupResult | null>(null);
+  const [runningCleanup, setRunningCleanup] = useState(false);
   const [dismissed, setDismissed] = useState<DismissedNotificationMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,17 +98,19 @@ export default function SettingsOverviewPage() {
       try {
         setLoading(true);
         setError("");
-        const [data, notificationData, onboardingData, storageData] = await Promise.all([
+        const [data, notificationData, onboardingData, storageData, schedulerData] = await Promise.all([
           getSettingsOverview(),
           getWorkspaceNotifications(),
           getOnboardingStatus(),
-          getStorageStats().catch(() => null)
+          getStorageStats().catch(() => null),
+          getSchedulerFleetStatus().catch(() => null)
         ]);
         if (!cancelled) {
           setOverview(data);
           setNotifications(notificationData.notifications);
           setOnboarding(onboardingData);
           setStorage(storageData);
+          setSchedulers(schedulerData?.schedulers ?? []);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load settings overview");
@@ -126,6 +135,28 @@ export default function SettingsOverviewPage() {
     const next = dismissNotification(notification, dismissed);
     setDismissed(next);
     writeDismissedNotifications(next);
+  }
+
+  const canRunCleanup = overview?.currentUser.permissions.includes("settings.write") ?? false;
+
+  async function runCleanup() {
+    if (runningCleanup) return;
+    setRunningCleanup(true);
+    setCleanupResult(null);
+    try {
+      const result = await runRetentionCleanup(false);
+      setCleanupResult(result);
+      const [storageData, schedulerData] = await Promise.all([
+        getStorageStats().catch(() => null),
+        getSchedulerFleetStatus().catch(() => null)
+      ]);
+      setStorage(storageData);
+      setSchedulers(schedulerData?.schedulers ?? []);
+    } catch (err: any) {
+      setError(err.message || "Failed to run retention cleanup");
+    } finally {
+      setRunningCleanup(false);
+    }
   }
 
   return (
@@ -305,6 +336,65 @@ export default function SettingsOverviewPage() {
                 tone="neutral"
               />
             )}
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-900">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                <h2 className="text-lg font-semibold text-slate-100">Maintenance</h2>
+              </div>
+              {canRunCleanup && (
+                <button
+                  type="button"
+                  onClick={runCleanup}
+                  disabled={runningCleanup}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${runningCleanup ? "animate-spin" : ""}`} aria-hidden="true" />
+                  {runningCleanup ? "Cleaning…" : "Run retention cleanup"}
+                </button>
+              )}
+            </div>
+            <div className="space-y-3 p-5">
+              {cleanupResult && (
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+                  Cleanup done: deleted {cleanupResult.usage.deleted} usage log
+                  {cleanupResult.usage.deleted === 1 ? "" : "s"} and {cleanupResult.notifications.deleted} notification
+                  {cleanupResult.notifications.deleted === 1 ? "" : "s"}.
+                </div>
+              )}
+              {schedulers.length === 0 ? (
+                <p className="text-sm text-slate-500">No scheduler activity recorded yet.</p>
+              ) : (
+                <ul className="divide-y divide-slate-800/60">
+                  {schedulers.map((scheduler) => (
+                    <li key={scheduler.name} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <div>
+                        <span className="font-medium text-slate-200">{scheduler.name.replace(/_/g, " ")}</span>
+                        <span className="ml-2 text-xs text-slate-500">
+                          {scheduler.runCount} run{scheduler.runCount === 1 ? "" : "s"}
+                          {scheduler.failureCount > 0 ? `, ${scheduler.failureCount} failed` : ""}
+                          {scheduler.lastFinishedAt ? ` · last ${new Date(scheduler.lastFinishedAt).toLocaleString()}` : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {scheduler.lastStatus && (
+                          <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-400">{scheduler.lastStatus}</span>
+                        )}
+                        <span
+                          className={`rounded px-2 py-0.5 text-xs font-medium ${
+                            scheduler.enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-500"
+                          }`}
+                        >
+                          {scheduler.enabled ? "enabled" : "disabled"}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
 
           <section>
