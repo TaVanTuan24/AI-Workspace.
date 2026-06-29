@@ -420,6 +420,7 @@ provider: providerCheck.provider,
       void unsubscribe?.();
     } else {
       request.raw.on("close", () => {
+        if (finished) return;
         finished = true;
         clearInterval(pingInterval);
         void unsubscribe?.();
