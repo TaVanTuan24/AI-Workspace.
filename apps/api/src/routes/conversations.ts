@@ -6,7 +6,8 @@ import {
   listThreads,
   getThreadDetail,
   deleteThread,
-  renameThread
+  renameThread,
+  saveDiscussion
 } from "../services/conversationHistoryService.js";
 import { z } from "zod";
 import { attachLocalUser } from "../middleware/auth.js";
@@ -18,6 +19,20 @@ const ListQuerySchema = z.object({
 
 const RenameBodySchema = z.object({
   title: z.string().min(1).max(200)
+});
+
+const SaveDiscussionSchema = z.object({
+  topic: z.string().min(1).max(2000),
+  entries: z
+    .array(
+      z.object({
+        round: z.number().int().min(1).max(100),
+        provider: z.string().min(1).max(64),
+        text: z.string().min(1)
+      })
+    )
+    .min(1)
+    .max(200)
 });
 
 const ImportRequestSchema = z.object({
@@ -57,6 +72,20 @@ export const conversationsRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const result = await listThreads(request.user.id, parsed.data);
     return reply.send(result);
+  });
+
+  // Persist a completed discussion (topic + ordered turns) as a thread.
+  fastify.post("/settings/conversations/discussion", async (request, reply) => {
+    const parsed = SaveDiscussionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid discussion payload." });
+    }
+    try {
+      const result = await saveDiscussion(request.user.id, parsed.data.topic, parsed.data.entries);
+      return reply.send(result);
+    } catch (error: any) {
+      return reply.code(400).send({ error: error.message || "Could not save discussion." });
+    }
   });
 
   fastify.get("/settings/conversations/:threadId", async (request, reply) => {

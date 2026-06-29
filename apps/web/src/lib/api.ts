@@ -1015,16 +1015,31 @@ export interface ConversationThreadMessage {
   provider: string | null;
   content: string;
   model: string | null;
+  round: number | null;
   createdAt: string;
 }
 
 export interface ConversationThreadDetail {
   id: string;
   title: string | null;
+  kind: "chat" | "discussion";
   createdAt: string;
   updatedAt: string;
   providers: string[];
   messages: ConversationThreadMessage[];
+}
+
+export async function saveDiscussionToHistory(
+  topic: string,
+  entries: Array<{ round: number; provider: string; text: string }>
+): Promise<{ threadId: string }> {
+  const response = await fetch(`${API_BASE_URL}/settings/conversations/discussion`, {
+    method: "POST",
+    headers: { "x-local-user-id": "local-user", "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, entries })
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to save discussion"));
+  return response.json();
 }
 
 export async function listConversationThreads(

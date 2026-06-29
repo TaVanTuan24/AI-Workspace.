@@ -20,6 +20,7 @@ import {
   getConversationThread,
   renameConversationThread,
   deleteConversationThread,
+  saveDiscussionToHistory,
   type ChatAttachmentView,
   type ConversationThreadSummary
 } from "../../lib/api";
@@ -125,6 +126,8 @@ export function ChatWorkspace() {
   const [discussionEntries, setDiscussionEntries] = useState<DiscussionEntry[]>([]);
   const [discussionRunning, setDiscussionRunning] = useState(false);
   const [discussionError, setDiscussionError] = useState("");
+  const [discussionNotice, setDiscussionNotice] = useState("");
+  const [savingDiscussion, setSavingDiscussion] = useState(false);
   const discussionAbortRef = useRef(false);
   // Lets stopDiscussion force-resolve the in-flight step even if the worker
   // never emits a terminal event (e.g. it is down), so the loop can unwind.
@@ -469,6 +472,7 @@ export function ChatWorkspace() {
     const rounds = Math.min(Math.max(Math.trunc(discussionRounds) || 1, 1), 10);
     discussionAbortRef.current = false;
     setDiscussionError("");
+    setDiscussionNotice("");
     setDiscussionRunning(true);
     setDiscussionEntries([]);
     setDiscussionTopic(topic);
@@ -551,11 +555,61 @@ export function ChatWorkspace() {
     URL.revokeObjectURL(url);
   }
 
+  async function saveDiscussionHistory() {
+    if (savingDiscussion) return;
+    const entries = discussionEntries
+      .filter((entry) => entry.status === "completed" && entry.text.trim())
+      .map((entry) => ({ round: entry.round, provider: entry.provider, text: entry.text }));
+    if (entries.length === 0) {
+      setDiscussionError("Nothing to save yet — let at least one turn complete.");
+      return;
+    }
+    setSavingDiscussion(true);
+    setDiscussionError("");
+    setDiscussionNotice("");
+    try {
+      await saveDiscussionToHistory(discussionTopic, entries);
+      setDiscussionNotice("Saved to history.");
+      void queryClient.invalidateQueries({ queryKey: ["conversationThreads"] });
+    } catch (error) {
+      setDiscussionError(errorMessage(error));
+    } finally {
+      setSavingDiscussion(false);
+    }
+  }
+
   async function openThread(id: string) {
     setHistoryError("");
     try {
       const detail = await getConversationThread(id);
       closeAllStreams();
+
+      // A saved discussion replays into the discussion transcript, not the
+      // single/compare turn view.
+      if (detail.kind === "discussion") {
+        const topicMessage = detail.messages.find((message) => message.role === "user");
+        const entries: DiscussionEntry[] = detail.messages
+          .filter((message) => message.role !== "user")
+          .map((message) => {
+            const provider = (message.provider ?? "assistant") as ProviderId;
+            return {
+              id: message.id,
+              round: message.round ?? 1,
+              provider,
+              displayName: byProvider.get(provider)?.displayName ?? provider,
+              status: "completed" as CardStatus,
+              text: message.content
+            };
+          });
+        startNewConversation();
+        setMode("discussion");
+        setDiscussionTopic(topicMessage?.content ?? detail.title ?? "");
+        setDiscussionEntries(entries);
+        setDiscussionError("");
+        setDiscussionNotice("");
+        return;
+      }
+
       const hydrated: Turn[] = [];
       let current: Turn | null = null;
       for (const message of detail.messages) {
@@ -577,6 +631,7 @@ export function ChatWorkspace() {
           };
         }
       }
+      setMode((prev) => (prev === "discussion" ? "single" : prev));
       setTurns(hydrated);
       setThreadId(detail.id);
       setAttachments([]);
@@ -981,7 +1036,8 @@ export function ChatWorkspace() {
               </span>
             </div>
             {discussionError ? <div className="mt-2 text-xs text-red-500">{discussionError}</div> : null}
-            <div className="mt-3 flex gap-2">
+            {discussionNotice ? <div className="mt-2 text-xs text-emerald-600">{discussionNotice}</div> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
               {discussionRunning ? (
                 <button
                   type="button"
@@ -1003,6 +1059,15 @@ export function ChatWorkspace() {
                 </button>
               )}
               <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface disabled:opacity-50"
+                disabled={savingDiscussion || discussionRunning || discussionEntries.length === 0}
+                onClick={() => void saveDiscussionHistory()}
+              >
+                <Check className="h-4 w-4" />
+                {savingDiscussion ? "Saving…" : "Save to history"}
+              </button>
+              <button
                 title="Export discussion as Markdown"
                 type="button"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-surface disabled:opacity-50"
@@ -1019,6 +1084,7 @@ export function ChatWorkspace() {
                 onClick={() => {
                   setDiscussionEntries([]);
                   setDiscussionError("");
+                  setDiscussionNotice("");
                 }}
               >
                 <X className="h-4 w-4" />

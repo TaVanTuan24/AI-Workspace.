@@ -5,7 +5,8 @@ import {
   listThreads,
   getThreadDetail,
   deleteThread,
-  renameThread
+  renameThread,
+  saveDiscussion
 } from "../conversationHistoryService.js";
 
 const runId = makeTestRunId("conversationHistory");
@@ -125,5 +126,34 @@ describe("conversationHistoryService", () => {
 
     const remaining = await prisma.message.count({ where: { threadId: thread.id } });
     expect(remaining).toBe(0);
+  });
+
+  it("saves a discussion and reloads it as a discussion thread with rounds", async () => {
+    const { threadId } = await saveDiscussion(userId, "Is AI conscious?", [
+      { round: 1, provider: "gemini", text: "Gemini round 1" },
+      { round: 1, provider: "chatgpt", text: "ChatGPT round 1" },
+      { round: 2, provider: "gemini", text: "Gemini round 2" }
+    ]);
+
+    const detail = await getThreadDetail(userId, threadId);
+    expect(detail).not.toBeNull();
+    expect(detail!.kind).toBe("discussion");
+    expect(detail!.title).toBe("[Discussion] Is AI conscious?");
+
+    // 1 topic (user) + 3 assistant turns.
+    expect(detail!.messages).toHaveLength(4);
+    expect(detail!.messages[0].role).toBe("user");
+    expect(detail!.messages[0].round).toBeNull();
+    const assistantRounds = detail!.messages.filter((m) => m.role === "assistant").map((m) => m.round);
+    expect(assistantRounds).toEqual([1, 1, 2]);
+    expect(detail!.providers).toEqual(["chatgpt", "gemini"]);
+
+    // It also shows up in the thread list.
+    const list = await listThreads(userId);
+    expect(list.threads.some((t) => t.id === threadId)).toBe(true);
+  });
+
+  it("rejects an empty discussion", async () => {
+    await expect(saveDiscussion(userId, "Topic", [])).rejects.toThrow();
   });
 });

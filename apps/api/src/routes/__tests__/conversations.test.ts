@@ -119,6 +119,42 @@ describe("conversations routes", () => {
     });
   });
 
+  describe("POST /settings/conversations/discussion (save)", () => {
+    it("saves a discussion and returns the thread id", async () => {
+      vi.mocked(historyService.saveDiscussion).mockResolvedValueOnce({ threadId: "disc-1" } as any);
+      const response = await app.inject({
+        method: "POST",
+        url: "/settings/conversations/discussion",
+        payload: {
+          topic: "Is AI conscious?",
+          entries: [
+            { round: 1, provider: "gemini", text: "yes" },
+            { round: 1, provider: "chatgpt", text: "no" }
+          ]
+        }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ threadId: "disc-1" });
+      expect(historyService.saveDiscussion).toHaveBeenCalledWith(
+        expect.any(String),
+        "Is AI conscious?",
+        [
+          { round: 1, provider: "gemini", text: "yes" },
+          { round: 1, provider: "chatgpt", text: "no" }
+        ]
+      );
+    });
+
+    it("rejects an empty entries array", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/settings/conversations/discussion",
+        payload: { topic: "x", entries: [] }
+      });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
   describe("GET /settings/conversations/:threadId (detail)", () => {
     it("returns thread detail", async () => {
       const mockDetail = {

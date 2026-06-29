@@ -20,16 +20,24 @@ export interface ThreadDetailMessage {
   provider: string | null;
   content: string;
   model: string | null;
+  round: number | null;
   createdAt: string;
 }
 
 export interface ThreadDetail {
   id: string;
   title: string | null;
+  kind: "chat" | "discussion";
   createdAt: string;
   updatedAt: string;
   providers: string[];
   messages: ThreadDetailMessage[];
+}
+
+export interface DiscussionEntryInput {
+  round: number;
+  provider: string;
+  text: string;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -40,17 +48,20 @@ function clampLimit(limit?: number): number {
   return Math.min(Math.max(Math.trunc(limit), 1), MAX_LIMIT);
 }
 
-function modelFromMetadata(metadataJson: string | null): string | null {
-  if (!metadataJson) return null;
+function parseMetadata(metadataJson: string | null): { model: string | null; round: number | null } {
+  if (!metadataJson) return { model: null, round: null };
   try {
     const parsed = JSON.parse(metadataJson);
-    if (parsed && typeof parsed === "object" && typeof parsed.model === "string") {
-      return parsed.model;
+    if (parsed && typeof parsed === "object") {
+      return {
+        model: typeof parsed.model === "string" ? parsed.model : null,
+        round: typeof parsed.round === "number" ? parsed.round : null
+      };
     }
   } catch {
     // ignore malformed metadata
   }
-  return null;
+  return { model: null, round: null };
 }
 
 export async function listThreads(
@@ -126,14 +137,18 @@ export async function getThreadDetail(userId: string, threadId: string): Promise
   if (!thread) return null;
 
   const providers = new Set<string>();
+  let isDiscussion = false;
   const messages: ThreadDetailMessage[] = thread.messages.map((msg) => {
     if (msg.provider) providers.add(msg.provider);
+    const { model, round } = parseMetadata(msg.metadataJson);
+    if (round !== null) isDiscussion = true;
     return {
       id: msg.id,
       role: msg.role,
       provider: msg.provider,
       content: msg.content,
-      model: modelFromMetadata(msg.metadataJson),
+      model,
+      round,
       createdAt: msg.createdAt.toISOString()
     };
   });
@@ -141,11 +156,55 @@ export async function getThreadDetail(userId: string, threadId: string): Promise
   return {
     id: thread.id,
     title: thread.title,
+    kind: isDiscussion ? "discussion" : "chat",
     createdAt: thread.createdAt.toISOString(),
     updatedAt: thread.updatedAt.toISOString(),
     providers: Array.from(providers).sort(),
     messages
   };
+}
+
+const MAX_DISCUSSION_ENTRIES = 200;
+
+// Persist a completed discussion as a single thread: one user message holding
+// the topic, then one assistant message per turn carrying { round } metadata so
+// the thread can be recognised and replayed as a discussion later.
+export async function saveDiscussion(
+  userId: string,
+  topic: string,
+  entries: DiscussionEntryInput[]
+): Promise<{ threadId: string }> {
+  const trimmedTopic = topic.trim().slice(0, 2000) || "Discussion";
+  if (entries.length === 0) {
+    throw new Error("A discussion needs at least one turn to save.");
+  }
+  const kept = entries.slice(0, MAX_DISCUSSION_ENTRIES);
+  const title = `[Discussion] ${trimmedTopic}`.slice(0, 200);
+
+  const thread = await prisma.chatThread.create({ data: { userId, title } });
+  await prisma.message.create({
+    data: {
+      threadId: thread.id,
+      userId,
+      role: "user",
+      content: trimmedTopic,
+      metadataJson: JSON.stringify({ kind: "discussion" })
+    }
+  });
+  for (const entry of kept) {
+    await prisma.message.create({
+      data: {
+        threadId: thread.id,
+        userId,
+        role: "assistant",
+        provider: entry.provider,
+        content: entry.text,
+        metadataJson: JSON.stringify({ kind: "discussion", round: entry.round })
+      }
+    });
+  }
+
+  return { threadId: thread.id };
 }
 
 export async function deleteThread(userId: string, threadId: string): Promise<boolean> {
